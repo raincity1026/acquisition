@@ -3,7 +3,8 @@ FROM python:3.12-slim
 ENV TZ=Asia/Shanghai \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tzdata ca-certificates \
