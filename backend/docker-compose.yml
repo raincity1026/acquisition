@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: marsian
+      POSTGRES_PASSWORD: marsian
+      POSTGRES_DB: marsian
+    ports:
+      - "5433:5432"   # 用 5433 避开本机可能已占用的 5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marsian"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
