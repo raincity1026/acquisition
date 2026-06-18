@@ -1,0 +1,33 @@
+name: Deploy
+
+# push 到 main 自动部署；也可在 Actions 页面手动触发
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一时间只跑一个部署，避免并发互踩
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH 到服务器执行部署
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          command_timeout: 20m # 后端镜像构建较慢，给足时间
+          script: |
+            set -e
+            cd ~/acquisition
+            git fetch origin main
+            git reset --hard origin/main   # 与远程一致；不动 .env.prod 等未跟踪文件
+            docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+            docker image prune -f          # 清理旧镜像，省磁盘
+            docker compose -f docker-compose.prod.yml ps
