@@ -45,7 +45,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         scheduler.shutdown(wait=False)
 
 
-app = FastAPI(title="marsian-acquisition", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="acquisition", version="0.1.0", lifespan=lifespan)
 app.include_router(router)
 app.include_router(account_router)
 

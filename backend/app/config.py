@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://marsian:marsian@localhost:5433/marsian"
+    database_url: str = "postgresql+asyncpg://acquisition:acquisition@localhost:5433/acquisition"
 
     # JWT。生产务必用环境变量覆盖 jwt_secret。
     jwt_secret: str = "dev-insecure-secret-change-me-in-production-0123456789"

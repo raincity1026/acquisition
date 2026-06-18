@@ -1,5 +1,5 @@
 [project]
-name = "marsian-acquisition"
+name = "acquisition"
 version = "0.1.0"
 description = "盘后 A 股复盘工具 — 后端 (M0 数据链)"
 readme = "README.md"

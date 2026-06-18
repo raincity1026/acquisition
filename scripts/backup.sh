@@ -16,7 +16,7 @@ PG_DB="${POSTGRES_DB:?请在 .env.prod 设置 POSTGRES_DB}"
 mkdir -p backup
 docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T db \
   pg_dump -U "$PG_USER" "$PG_DB" \
-  | gzip >"backup/marsian-$(date +%F).sql.gz"
-echo "$(date '+%F %T') backup -> backup/marsian-$(date +%F).sql.gz"
+  | gzip >"backup/acquisition-$(date +%F).sql.gz"
+echo "$(date '+%F %T') backup -> backup/acquisition-$(date +%F).sql.gz"
 # 只保留最近 14 天
-find backup -name 'marsian-*.sql.gz' -mtime +14 -delete
+find backup -name 'acquisition-*.sql.gz' -mtime +14 -delete

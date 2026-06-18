@@ -1,4 +1,4 @@
-# marsian-acquisition — backend
+# acquisition — backend
 
 盘后 A 股复盘工具的后端。M0 打通最小数据链：Baostock → 标准化 → PostgreSQL → `GET /api/kline`。
 
