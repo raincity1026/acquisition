@@ -5,6 +5,12 @@ export interface WatchItem {
   name: string
   last_close: number | null
   change_pct: number | null
+  group_ids: number[]
+}
+
+export interface Group {
+  id: number
+  name: string
 }
 
 export interface SearchHit {
@@ -30,4 +36,27 @@ export async function apiRemoveWatch(symbol: string): Promise<void> {
 export async function apiSearch(q: string): Promise<SearchHit[]> {
   const { data } = await axios.get<SearchHit[]>('/api/search', { params: { q, limit: 15 } })
   return data
+}
+
+// ---- 分组 ----
+export async function apiListGroups(): Promise<Group[]> {
+  const { data } = await axios.get<Group[]>('/api/watchlist/groups')
+  return data
+}
+
+export async function apiCreateGroup(name: string): Promise<Group> {
+  const { data } = await axios.post<Group>('/api/watchlist/groups', { name })
+  return data
+}
+
+export async function apiRenameGroup(id: number, name: string): Promise<void> {
+  await axios.patch(`/api/watchlist/groups/${id}`, { name })
+}
+
+export async function apiDeleteGroup(id: number): Promise<void> {
+  await axios.delete(`/api/watchlist/groups/${id}`)
+}
+
+export async function apiSetSymbolGroups(symbol: string, groupIds: number[]): Promise<void> {
+  await axios.put(`/api/watchlist/${symbol}/groups`, { group_ids: groupIds })
 }

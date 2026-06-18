@@ -9,7 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.providers.base import Bar, Instrument
 
-from .models import DailyBarORM, InstrumentORM, UserORM, WatchlistORM
+from .models import (
+    DailyBarORM,
+    InstrumentORM,
+    UserORM,
+    WatchlistGroupMemberORM,
+    WatchlistGroupORM,
+    WatchlistORM,
+)
 
 
 # asyncpg 单条语句参数上限 32767；按 列数 切块，留余量。
@@ -211,6 +218,15 @@ async def add_watch(session: AsyncSession, user_id: int, symbol: str) -> None:
 
 
 async def remove_watch(session: AsyncSession, user_id: int, symbol: str) -> None:
+    # 连带清掉该票在本用户各分组里的归属
+    await session.execute(
+        delete(WatchlistGroupMemberORM).where(
+            WatchlistGroupMemberORM.symbol == symbol,
+            WatchlistGroupMemberORM.group_id.in_(
+                select(WatchlistGroupORM.id).where(WatchlistGroupORM.user_id == user_id)
+            ),
+        )
+    )
     await session.execute(
         delete(WatchlistORM).where(WatchlistORM.user_id == user_id, WatchlistORM.symbol == symbol)
     )
@@ -240,3 +256,96 @@ async def latest_quote(session: AsyncSession, symbol: str) -> tuple[date, float,
     last_date, last_close = rows[0]
     prev_close = rows[1][1] if len(rows) > 1 else last_close
     return (last_date, float(last_close), float(prev_close))
+
+
+# ---------- 自选分组 ----------
+async def create_group(session: AsyncSession, user_id: int, name: str) -> int:
+    group = WatchlistGroupORM(user_id=user_id, name=name)
+    session.add(group)
+    await session.commit()
+    await session.refresh(group)
+    return group.id
+
+
+async def group_name_exists(
+    session: AsyncSession, user_id: int, name: str, exclude_id: int | None = None
+) -> bool:
+    stmt = select(WatchlistGroupORM.id).where(
+        WatchlistGroupORM.user_id == user_id, WatchlistGroupORM.name == name
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(WatchlistGroupORM.id != exclude_id)
+    return (await session.scalar(stmt)) is not None
+
+
+async def list_groups(session: AsyncSession, user_id: int) -> list[tuple[int, str]]:
+    stmt = (
+        select(WatchlistGroupORM.id, WatchlistGroupORM.name)
+        .where(WatchlistGroupORM.user_id == user_id)
+        .order_by(WatchlistGroupORM.created_at, WatchlistGroupORM.id)
+    )
+    return [(r[0], r[1]) for r in (await session.execute(stmt)).all()]
+
+
+async def get_group_owner(session: AsyncSession, group_id: int) -> int | None:
+    row = await session.get(WatchlistGroupORM, group_id)
+    return row.user_id if row else None
+
+
+async def rename_group(session: AsyncSession, group_id: int, name: str) -> None:
+    await session.execute(
+        update(WatchlistGroupORM).where(WatchlistGroupORM.id == group_id).values(name=name)
+    )
+    await session.commit()
+
+
+async def delete_group(session: AsyncSession, group_id: int) -> None:
+    # 成员关联 ON DELETE CASCADE 自动清掉 → 那些票回到默认分组
+    await session.execute(delete(WatchlistGroupORM).where(WatchlistGroupORM.id == group_id))
+    await session.commit()
+
+
+async def set_member_groups(
+    session: AsyncSession, user_id: int, symbol: str, group_ids: list[int]
+) -> None:
+    """替换式设置该票所属分组；只接受属于本用户的分组 id。"""
+    owned = set(
+        (
+            await session.scalars(
+                select(WatchlistGroupORM.id).where(WatchlistGroupORM.user_id == user_id)
+            )
+        ).all()
+    )
+    if not owned:
+        return  # 用户没有任何分组，无可设置/可清理
+    valid = [g for g in group_ids if g in owned]
+    # 先清掉该票在本用户各组的旧归属
+    await session.execute(
+        delete(WatchlistGroupMemberORM).where(
+            WatchlistGroupMemberORM.symbol == symbol,
+            WatchlistGroupMemberORM.group_id.in_(owned),
+        )
+    )
+    for gid in valid:
+        session.add(WatchlistGroupMemberORM(group_id=gid, symbol=symbol))
+    await session.commit()
+
+
+async def group_ids_by_symbol(
+    session: AsyncSession, user_id: int, symbols: list[str]
+) -> dict[str, list[int]]:
+    """本用户的 symbol → 所属 group_id 列表，供自选列表分段。"""
+    if not symbols:
+        return {}
+    stmt = (
+        select(WatchlistGroupMemberORM.symbol, WatchlistGroupMemberORM.group_id)
+        .join(WatchlistGroupORM, WatchlistGroupORM.id == WatchlistGroupMemberORM.group_id)
+        .where(
+            WatchlistGroupORM.user_id == user_id,
+            WatchlistGroupMemberORM.symbol.in_(symbols),
+        )
+    )
+    out: dict[str, list[int]] = {}
+    for sym, gid in (await session.execute(stmt)).all():
+        out.setdefault(sym, []).append(gid)
+    return out

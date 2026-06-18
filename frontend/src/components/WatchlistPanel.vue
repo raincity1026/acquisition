@@ -1,115 +1,186 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useSelection } from '../composables/useSelection'
+import { computed, onMounted, ref } from 'vue'
+import type { Group } from '../api/watchlist'
 import { useWatchlist } from '../composables/useWatchlist'
+import WatchRow from './WatchRow.vue'
 
-const { items, reload, remove } = useWatchlist()
-const { view, inCompare, toggleCompare } = useSelection()
+const { items, groups, reload, createGroup, renameGroup, deleteGroup } = useWatchlist()
 
 onMounted(reload)
 
-function pctColor(v: number | null): string {
-  if (v === null) return '#888'
-  return v >= 0 ? '#d32f2f' : '#2e7d32' // A股红涨绿跌
+const addingGroup = ref(false)
+const newGroupName = ref('')
+
+const ungrouped = computed(() => items.value.filter((i) => i.group_ids.length === 0))
+function itemsOf(gid: number) {
+  return items.value.filter((i) => i.group_ids.includes(gid))
 }
-function fmtPct(v: number | null): string {
-  if (v === null) return '—'
-  return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
+
+async function submitGroup() {
+  const name = newGroupName.value.trim()
+  if (!name) return
+  try {
+    await createGroup(name)
+    newGroupName.value = ''
+    addingGroup.value = false
+  } catch (e) {
+    alert(errMsg(e))
+  }
+}
+async function doRename(g: Group) {
+  const name = prompt('重命名分组', g.name)?.trim()
+  if (name && name !== g.name) {
+    try {
+      await renameGroup(g.id, name)
+    } catch (e) {
+      alert(errMsg(e))
+    }
+  }
+}
+async function doDelete(g: Group) {
+  if (confirm(`删除分组「${g.name}」？组内股票会回到默认分组（不会从自选删除）。`)) {
+    await deleteGroup(g.id)
+  }
+}
+
+function errMsg(e: unknown): string {
+  if (typeof e === 'object' && e && 'response' in e) {
+    const r = (e as { response?: { data?: { detail?: string } } }).response
+    if (r?.data?.detail) return r.data.detail
+  }
+  return '操作失败'
 }
 </script>
 
 <template>
   <aside class="watchlist">
-    <h3>自选股</h3>
+    <div class="head">
+      <h3>自选股</h3>
+      <button class="addgrp" title="新建分组" @click="addingGroup = !addingGroup">＋ 分组</button>
+    </div>
+    <div v-if="addingGroup" class="newgrp">
+      <input v-model="newGroupName" placeholder="新分组名" @keyup.enter="submitGroup" />
+      <button @click="submitGroup">建</button>
+    </div>
+
     <p v-if="items.length === 0" class="empty">用上方搜索添加标的</p>
-    <ul>
-      <li v-for="it in items" :key="it.symbol">
-        <input
-          type="checkbox"
-          title="加入对比"
-          :checked="inCompare(it.symbol)"
-          @change="toggleCompare(it.symbol)"
-        />
-        <span class="info" @click="view(it.symbol)">
-          <span class="name">{{ it.name }}</span>
-          <span class="code">{{ it.symbol }}</span>
-        </span>
-        <span class="quote">
-          <span class="px">{{ it.last_close?.toFixed(2) ?? '—' }}</span>
-          <span class="pct" :style="{ color: pctColor(it.change_pct) }">{{
-            fmtPct(it.change_pct)
-          }}</span>
-        </span>
-        <button class="x" title="删除" @click="remove(it.symbol)">×</button>
-      </li>
+
+    <!-- 无分组：扁平展示 -->
+    <ul v-if="groups.length === 0" class="list">
+      <WatchRow v-for="it in items" :key="it.symbol" :item="it" :groups="groups" />
     </ul>
+
+    <!-- 有分组：命名分组段（含空组便于管理）+ 默认分组段 -->
+    <template v-else>
+      <section v-for="g in groups" :key="g.id" class="section">
+        <div class="title">
+          <span class="gname">{{ g.name }}</span>
+          <span class="count">{{ itemsOf(g.id).length }}</span>
+          <button class="mini" title="重命名" @click="doRename(g)">✎</button>
+          <button class="mini" title="删除分组" @click="doDelete(g)">🗑</button>
+        </div>
+        <ul class="list">
+          <WatchRow
+            v-for="it in itemsOf(g.id)"
+            :key="g.id + '-' + it.symbol"
+            :item="it"
+            :groups="groups"
+          />
+        </ul>
+      </section>
+
+      <section class="section">
+        <div class="title">
+          <span class="gname">默认分组</span>
+          <span class="count">{{ ungrouped.length }}</span>
+        </div>
+        <ul class="list">
+          <WatchRow
+            v-for="it in ungrouped"
+            :key="'def-' + it.symbol"
+            :item="it"
+            :groups="groups"
+          />
+        </ul>
+      </section>
+    </template>
   </aside>
 </template>
 
 <style scoped>
 .watchlist {
-  width: 240px;
+  width: 250px;
   border-right: 1px solid #eee;
   padding: 10px 8px;
 }
-.watchlist h3 {
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 8px;
+}
+.head h3 {
   font-size: 14px;
-  margin: 4px 8px 10px;
+  margin: 0;
+}
+.addgrp {
+  border: none;
+  background: transparent;
+  color: #1565c0;
+  cursor: pointer;
+  font-size: 12px;
+}
+.newgrp {
+  display: flex;
+  gap: 6px;
+  padding: 0 4px 8px;
+}
+.newgrp input {
+  flex: 1;
+  padding: 4px 6px;
+  min-width: 0;
 }
 .empty {
   color: #999;
   font-size: 13px;
   padding: 0 8px;
 }
-ul {
+.list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-li {
+.section {
+  margin-bottom: 8px;
+}
+.title {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #666;
+  background: #fafafa;
+  border-radius: 4px;
 }
-li:hover {
-  background: #f6f7f9;
+.gname {
+  font-weight: 600;
 }
-.info {
-  display: flex;
-  flex-direction: column;
-  cursor: pointer;
-  flex: 1;
-  min-width: 0;
+.count {
+  color: #aaa;
 }
-.name {
-  font-size: 13px;
-}
-.code {
-  font-size: 11px;
-  color: #999;
-}
-.quote {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-.px {
-  font-size: 13px;
-}
-.pct {
-  font-size: 11px;
-}
-.x {
+.mini {
   border: none;
   background: transparent;
-  color: #bbb;
   cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
+  font-size: 12px;
+  margin-left: auto;
+  opacity: 0.6;
 }
-.x:hover {
-  color: #c62828;
+.mini:last-child {
+  margin-left: 0;
+}
+.mini:hover {
+  opacity: 1;
 }
 </style>
