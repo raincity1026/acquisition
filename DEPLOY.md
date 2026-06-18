@@ -44,14 +44,17 @@ docker compose -f docker-compose.prod.yml logs -f backend
 ```
 浏览器开 `http://服务器IP` 应能看到登录页。
 
-### 5. ⚠️ 验证云端能抓数据源（spike 的云端版，务必做）
-本地通不代表云上通。在服务器上：
+### 4.5 ⚠️ 一次性导入全市场标的（搜索/自选的数据基础，**必做**）
+全新部署 `instruments` 表是空的，不导入则**搜索无结果、加自选 404**（行情仍按需抓，但标的列表要预加载）：
 ```bash
-docker compose -f docker-compose.prod.yml exec backend \
-  uv run python -c "import baostock as bs; r=bs.login(); print('baostock', r.error_code, r.error_msg); bs.logout()"
+docker compose --env-file .env.prod -f docker-compose.prod.yml \
+  exec backend uv run python -m app.seed_instruments
 ```
-返回 `0 success` 才算通。再随便注册个号、搜一只票看图，确认能按需抓到行情。
-不通就是节点网络问题，换节点或排查。
+看到 `已导入标的 6xxx 条` 即成功。幂等，可重复跑。**这步同时就是下面第 5 步的连通性验证**——能拉到 6000+ 条即说明云机能访问 baostock。
+
+### 5. ⚠️ 验证云端能抓数据源（spike 的云端版）
+若上面 4.5 成功导入 6000+ 条，baostock 连通性已通过。再随便注册个号、搜一只票看图，确认能按需抓到行情即可。
+若 4.5 报「所有数据源都拉取标的列表失败」，就是节点连不上数据源（网络/地域问题），换节点或排查。
 
 ### 6. 域名 + HTTPS
 1. 买域名，DNS A 记录指向服务器 IP。
