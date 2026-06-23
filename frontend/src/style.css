@@ -1,7 +1,10 @@
+/* 全局基础样式，全部引用设计令牌（见 styles/tokens.css）。 */
 :root {
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  color: #1a1a1a;
-  background: #fff;
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: var(--c-text);
+  background: var(--c-bg);
 }
 
 * {
@@ -12,10 +15,8 @@ body {
   margin: 0;
 }
 
-button,
-input {
-  font: inherit;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #fff;
+/* 默认数字等宽，价格/表格自动对齐 */
+table,
+.tabular {
+  font-variant-numeric: tabular-nums;
 }

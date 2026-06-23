@@ -1,0 +1,113 @@
+/* ============================================================
+   acquisition 设计令牌（Design Tokens）——全站唯一样式来源。
+   所有组件用这些 CSS 变量，别再写散落的硬编码颜色/间距/圆角。
+   修改这里即全站生效；暗色模式后续在 .dark 作用域覆盖同名变量。
+   ============================================================ */
+:root {
+  /* ---------- 主色（专业蓝，品牌/主操作）---------- */
+  --c-primary-50: #eff6ff;
+  --c-primary-100: #dbeafe;
+  --c-primary-200: #bfdbfe;
+  --c-primary-300: #93c5fd;
+  --c-primary-400: #60a5fa;
+  --c-primary-500: #3b82f6;
+  --c-primary-600: #2563eb; /* 主色：按钮/链接/聚焦 */
+  --c-primary-700: #1d4ed8;
+  --c-primary-800: #1e40af;
+  --c-primary-900: #1e3a8a;
+  --c-primary: var(--c-primary-600);
+  --c-primary-hover: var(--c-primary-700);
+
+  /* ---------- 中性/表面（背景·边框·文字）---------- */
+  --c-surface-0: #ffffff; /* 卡片/弹层底 */
+  --c-surface-50: #f7f8fa; /* 区块/表头底 */
+  --c-surface-100: #eef0f3;
+  --c-surface-200: #e3e6eb; /* 边框（默认）*/
+  --c-surface-300: #cdd2da; /* 边框（输入）*/
+  --c-surface-400: #9aa1ad;
+  --c-bg: #f4f5f7; /* 页面底色 */
+  --c-border: var(--c-surface-200);
+  --c-border-strong: var(--c-surface-300);
+
+  --c-text: #1f2329; /* 主文字 */
+  --c-text-secondary: #5c6470; /* 次要文字/标签 */
+  --c-text-tertiary: #8a909c; /* 辅助/占位 */
+  --c-text-inverse: #ffffff;
+
+  /* ---------- 涨跌语义（A股：红涨绿跌）。仅用于行情/价格场景 ---------- */
+  --c-up: #e5483d; /* 涨 */
+  --c-up-bg: #fdecec;
+  --c-down: #16a35c; /* 跌 */
+  --c-down-bg: #e8f6ee;
+  --c-flat: #8a909c; /* 平 */
+
+  /* ---------- 功能反馈（表单/提示，非涨跌）---------- */
+  --c-info: var(--c-primary-600);
+  --c-success: #16a35c;
+  --c-warning: #f59e0b;
+  --c-danger: #dc2626; /* 仅破坏性操作（删除确认）*/
+
+  /* ---------- 字体 ---------- */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  /* 数字/价格：用等宽数字保证表格列对齐 */
+  --font-num: var(--font-sans);
+
+  --fs-caption: 12px; /* 角标/计数 */
+  --fs-sm: 13px; /* 密集正文/表格 */
+  --fs-base: 14px; /* 默认正文 */
+  --fs-md: 16px; /* 小标题 */
+  --fs-lg: 18px; /* 区块标题 */
+  --fs-xl: 20px; /* 页面副标题 */
+  --fs-2xl: 24px; /* 页面主标题 */
+
+  --fw-regular: 400;
+  --fw-medium: 500; /* 标签/强调 */
+  --fw-semibold: 600; /* 标题/重要数字 */
+
+  --lh-tight: 1.3;
+  --lh-base: 1.5;
+
+  /* ---------- 间距（4px 基准）---------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ---------- 圆角 ---------- */
+  --radius-sm: 4px;
+  --radius-md: 6px; /* 默认控件 */
+  --radius-lg: 8px; /* 卡片/弹层 */
+  --radius-pill: 999px;
+
+  /* ---------- 阴影/层级 ---------- */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.1);
+  --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
+
+  --z-sticky: 100;
+  --z-dropdown: 1000;
+  --z-modal: 2000;
+  --z-toast: 3000;
+}
+
+/* ---------- 工具类（少量，配合 token 用）---------- */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+.text-up {
+  color: var(--c-up);
+}
+.text-down {
+  color: var(--c-down);
+}
+.text-flat {
+  color: var(--c-flat);
+}
+/* 涨跌染色：传 --v（正/负）由组件按值切类，这里只给颜色 */
