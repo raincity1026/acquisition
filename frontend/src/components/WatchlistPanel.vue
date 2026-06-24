@@ -1,46 +1,53 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import { useConfirm } from 'primevue/useconfirm'
+import { useToast } from 'primevue/usetoast'
+import { computed, onMounted, reactive } from 'vue'
 import type { Group } from '../api/watchlist'
 import { useWatchlist } from '../composables/useWatchlist'
 import WatchRow from './WatchRow.vue'
 
 const { items, groups, reload, createGroup, renameGroup, deleteGroup } = useWatchlist()
+const confirm = useConfirm()
+const toast = useToast()
 
 onMounted(reload)
-
-const addingGroup = ref(false)
-const newGroupName = ref('')
 
 const ungrouped = computed(() => items.value.filter((i) => i.group_ids.length === 0))
 function itemsOf(gid: number) {
   return items.value.filter((i) => i.group_ids.includes(gid))
 }
 
+// 新建/重命名 共用一个对话框
+const dlg = reactive({ visible: false, mode: 'create' as 'create' | 'rename', id: 0, name: '' })
+function openCreate() {
+  Object.assign(dlg, { visible: true, mode: 'create', id: 0, name: '' })
+}
+function openRename(g: Group) {
+  Object.assign(dlg, { visible: true, mode: 'rename', id: g.id, name: g.name })
+}
 async function submitGroup() {
-  const name = newGroupName.value.trim()
+  const name = dlg.name.trim()
   if (!name) return
   try {
-    await createGroup(name)
-    newGroupName.value = ''
-    addingGroup.value = false
+    if (dlg.mode === 'create') await createGroup(name)
+    else await renameGroup(dlg.id, name)
+    dlg.visible = false
   } catch (e) {
-    alert(errMsg(e))
+    toast.add({ severity: 'error', summary: '操作失败', detail: errMsg(e), life: 3000 })
   }
 }
-async function doRename(g: Group) {
-  const name = prompt('重命名分组', g.name)?.trim()
-  if (name && name !== g.name) {
-    try {
-      await renameGroup(g.id, name)
-    } catch (e) {
-      alert(errMsg(e))
-    }
-  }
-}
-async function doDelete(g: Group) {
-  if (confirm(`删除分组「${g.name}」？组内股票会回到默认分组（不会从自选删除）。`)) {
-    await deleteGroup(g.id)
-  }
+function confirmDelete(g: Group) {
+  confirm.require({
+    header: '删除分组',
+    message: `删除分组「${g.name}」？组内股票会回到默认分组（不会从自选删除）。`,
+    icon: 'pi pi-exclamation-triangle',
+    rejectProps: { label: '取消', text: true },
+    acceptProps: { label: '删除', severity: 'danger' },
+    accept: () => deleteGroup(g.id),
+  })
 }
 
 function errMsg(e: unknown): string {
@@ -56,28 +63,40 @@ function errMsg(e: unknown): string {
   <aside class="watchlist">
     <div class="head">
       <h3>自选股</h3>
-      <button class="addgrp" title="新建分组" @click="addingGroup = !addingGroup">＋ 分组</button>
-    </div>
-    <div v-if="addingGroup" class="newgrp">
-      <input v-model="newGroupName" placeholder="新分组名" @keyup.enter="submitGroup" />
-      <button @click="submitGroup">建</button>
+      <Button label="分组" icon="pi pi-plus" text size="small" @click="openCreate" />
     </div>
 
     <p v-if="items.length === 0" class="empty">用上方搜索添加标的</p>
 
-    <!-- 无分组：扁平展示 -->
+    <!-- 无分组：扁平 -->
     <ul v-if="groups.length === 0" class="list">
       <WatchRow v-for="it in items" :key="it.symbol" :item="it" :groups="groups" />
     </ul>
 
-    <!-- 有分组：命名分组段（含空组便于管理）+ 默认分组段 -->
+    <!-- 有分组：命名分组段（含空组）+ 默认分组段 -->
     <template v-else>
       <section v-for="g in groups" :key="g.id" class="section">
         <div class="title">
           <span class="gname">{{ g.name }}</span>
           <span class="count">{{ itemsOf(g.id).length }}</span>
-          <button class="mini" title="重命名" @click="doRename(g)">✎</button>
-          <button class="mini" title="删除分组" @click="doDelete(g)">🗑</button>
+          <Button
+            icon="pi pi-pencil"
+            text
+            rounded
+            size="small"
+            severity="secondary"
+            aria-label="重命名"
+            @click="openRename(g)"
+          />
+          <Button
+            icon="pi pi-trash"
+            text
+            rounded
+            size="small"
+            severity="secondary"
+            aria-label="删除分组"
+            @click="confirmDelete(g)"
+          />
         </div>
         <ul class="list">
           <WatchRow
@@ -95,55 +114,47 @@ function errMsg(e: unknown): string {
           <span class="count">{{ ungrouped.length }}</span>
         </div>
         <ul class="list">
-          <WatchRow
-            v-for="it in ungrouped"
-            :key="'def-' + it.symbol"
-            :item="it"
-            :groups="groups"
-          />
+          <WatchRow v-for="it in ungrouped" :key="'def-' + it.symbol" :item="it" :groups="groups" />
         </ul>
       </section>
     </template>
+
+    <Dialog
+      v-model:visible="dlg.visible"
+      :header="dlg.mode === 'create' ? '新建分组' : '重命名分组'"
+      modal
+      :style="{ width: '300px' }"
+    >
+      <InputText v-model="dlg.name" placeholder="分组名" fluid autofocus @keyup.enter="submitGroup" />
+      <template #footer>
+        <Button label="取消" text @click="dlg.visible = false" />
+        <Button label="确定" @click="submitGroup" />
+      </template>
+    </Dialog>
   </aside>
 </template>
 
 <style scoped>
 .watchlist {
   width: 250px;
-  border-right: 1px solid #eee;
-  padding: 10px 8px;
+  border-right: 1px solid var(--c-border);
+  padding: var(--space-3) var(--space-2);
 }
 .head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 4px 8px;
+  padding: 0 var(--space-1) var(--space-2);
 }
 .head h3 {
-  font-size: 14px;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
   margin: 0;
 }
-.addgrp {
-  border: none;
-  background: transparent;
-  color: #1565c0;
-  cursor: pointer;
-  font-size: 12px;
-}
-.newgrp {
-  display: flex;
-  gap: 6px;
-  padding: 0 4px 8px;
-}
-.newgrp input {
-  flex: 1;
-  padding: 4px 6px;
-  min-width: 0;
-}
 .empty {
-  color: #999;
-  font-size: 13px;
-  padding: 0 8px;
+  color: var(--c-text-tertiary);
+  font-size: var(--fs-sm);
+  padding: 0 var(--space-2);
 }
 .list {
   list-style: none;
@@ -151,36 +162,29 @@ function errMsg(e: unknown): string {
   padding: 0;
 }
 .section {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 .title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  font-size: 12px;
-  color: #666;
-  background: #fafafa;
-  border-radius: 4px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--fs-caption);
+  color: var(--c-text-secondary);
+  background: var(--c-surface-50);
+  border-radius: var(--radius-sm);
 }
 .gname {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .count {
-  color: #aaa;
+  color: var(--c-text-tertiary);
 }
-.mini {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
+.title :deep(.p-button) {
+  width: 24px;
+  height: 24px;
+}
+.title :deep(.p-button:first-of-type) {
   margin-left: auto;
-  opacity: 0.6;
-}
-.mini:last-child {
-  margin-left: 0;
-}
-.mini:hover {
-  opacity: 1;
 }
 </style>

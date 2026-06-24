@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import Chip from 'primevue/chip'
+import DatePicker from 'primevue/datepicker'
+import ToggleSwitch from 'primevue/toggleswitch'
+import { computed, ref, watch } from 'vue'
 import ChartToolbar from '../components/ChartToolbar.vue'
 import ChartView from '../components/ChartView.vue'
 import CompareChart from '../components/CompareChart.vue'
@@ -21,6 +24,12 @@ const { bars, loading: sLoading, error: sError } = useKline(primary, period, adj
 
 // 对比态
 const baseDate = ref<string | null>(null)
+const baseDateObj = ref<Date | null>(null)
+watch(baseDateObj, (d) => {
+  baseDate.value = d
+    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    : null
+})
 const logAxis = ref(false)
 const { data: cmp, loading: cLoading, error: cError } = useCompare(symbols, baseDate)
 </script>
@@ -47,12 +56,18 @@ const { data: cmp, loading: cLoading, error: cError } = useCompare(symbols, base
     <!-- 对比态 -->
     <template v-else>
       <div class="cmp-toolbar">
-        <span v-for="s in symbols" :key="s" class="chip">
-          {{ s }}
-          <button class="x" @click="toggleCompare(s)">×</button>
-        </span>
-        <label class="ctl">基准日 <input type="date" v-model="baseDate" /></label>
-        <label class="ctl chk"><input type="checkbox" v-model="logAxis" /> 对数轴</label>
+        <Chip
+          v-for="s in symbols"
+          :key="s"
+          :label="s"
+          removable
+          @remove="toggleCompare(s)"
+        />
+        <label class="ctl">
+          基准日
+          <DatePicker v-model="baseDateObj" date-format="yy-mm-dd" show-icon size="small" placeholder="默认起点" />
+        </label>
+        <label class="ctl"><ToggleSwitch v-model="logAxis" /> 对数轴</label>
         <span class="muted">归一化对比（指标已隐藏）</span>
       </div>
       <div class="status">
@@ -70,7 +85,7 @@ const { data: cmp, loading: cLoading, error: cError } = useCompare(symbols, base
   min-width: 0;
 }
 .empty {
-  color: #999;
+  color: var(--c-text-tertiary);
   padding: 60px 20px;
   text-align: center;
 }
@@ -78,41 +93,25 @@ const { data: cmp, loading: cLoading, error: cError } = useCompare(symbols, base
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 16px;
-  padding: 4px 12px 10px;
-}
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  background: #f0f2f5;
-  border-radius: 14px;
-  font-size: 13px;
-}
-.chip .x {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: #888;
-  font-size: 15px;
-  line-height: 1;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-1) var(--space-3) var(--space-3);
 }
 .ctl {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 13px;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--c-text-secondary);
 }
 .status {
-  padding: 0 12px 6px;
+  padding: 0 var(--space-3) var(--space-2);
   min-height: 20px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .err {
-  color: #c62828;
+  color: var(--c-danger);
 }
 .muted {
-  color: #888;
+  color: var(--c-text-tertiary);
 }
 </style>

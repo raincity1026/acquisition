@@ -1,4 +1,6 @@
 import PrimeVue from 'primevue/config'
+import ConfirmationService from 'primevue/confirmationservice'
+import ToastService from 'primevue/toastservice'
 import { createApp } from 'vue'
 import 'primeicons/primeicons.css'
 import './styles/tokens.css'
@@ -13,4 +15,6 @@ createApp(App)
   .use(PrimeVue, {
     theme: { preset: AppPreset, options: { darkModeSelector: '.dark', cssLayer: false } },
   })
+  .use(ToastService)
+  .use(ConfirmationService)
   .mount('#app')

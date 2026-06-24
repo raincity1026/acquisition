@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import { ref } from 'vue'
 import { apiSearch, type SearchHit } from '../api/watchlist'
 import { useSelection } from '../composables/useSelection'
@@ -47,18 +49,21 @@ function close() {
 
 <template>
   <div class="search">
-    <input
-      v-model="q"
-      placeholder="搜索代码或名称，如 茅台 / 600519"
-      @input="onInput"
-      @focus="open = hits.length > 0"
-    />
+    <span class="p-input-icon-left">
+      <InputText
+        v-model="q"
+        placeholder="搜索代码或名称，如 茅台 / 600519"
+        fluid
+        @input="onInput"
+        @focus="open = hits.length > 0"
+      />
+    </span>
     <ul v-if="open && hits.length" class="dropdown">
       <li v-for="h in hits" :key="h.symbol">
         <span class="meta" @click="chart(h)">
           <b>{{ h.name }}</b> <span class="code">{{ h.symbol }}</span>
         </span>
-        <button class="add" title="加自选" @click="star(h)">＋自选</button>
+        <Button label="自选" icon="pi pi-plus" text size="small" @click="star(h)" />
       </li>
     </ul>
   </div>
@@ -67,51 +72,41 @@ function close() {
 <style scoped>
 .search {
   position: relative;
-  width: 320px;
-}
-.search input {
-  width: 100%;
-  padding: 7px 10px;
+  width: 340px;
 }
 .dropdown {
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
-  margin: 4px 0 0;
-  padding: 4px;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1);
   list-style: none;
-  background: #fff;
-  border: 1px solid #e5e5e5;
-  border-radius: 6px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  background: var(--c-surface-0);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   max-height: 340px;
   overflow: auto;
-  z-index: 20;
+  z-index: var(--z-dropdown);
 }
 .dropdown li {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 8px;
-  border-radius: 4px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
 }
 .dropdown li:hover {
-  background: #f6f7f9;
+  background: var(--c-surface-50);
 }
 .meta {
   cursor: pointer;
   flex: 1;
+  font-size: var(--fs-sm);
 }
 .code {
-  color: #999;
-  font-size: 12px;
-}
-.add {
-  border: none;
-  background: transparent;
-  color: #1565c0;
-  cursor: pointer;
-  font-size: 12px;
+  color: var(--c-text-tertiary);
+  font-size: var(--fs-caption);
 }
 </style>

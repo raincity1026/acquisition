@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
+import Popover from 'primevue/popover'
 import { ref } from 'vue'
 import type { Group, WatchItem } from '../api/watchlist'
 import { useSelection } from '../composables/useSelection'
@@ -8,7 +11,7 @@ const props = defineProps<{ item: WatchItem; groups: Group[] }>()
 const { view, inCompare, toggleCompare } = useSelection()
 const { remove, setSymbolGroups } = useWatchlist()
 
-const menuOpen = ref(false)
+const op = ref()
 
 function isIn(gid: number): boolean {
   return props.item.group_ids.includes(gid)
@@ -20,9 +23,9 @@ async function toggleGroup(gid: number) {
   await setSymbolGroups(props.item.symbol, next)
 }
 
-function pctColor(v: number | null): string {
-  if (v === null) return '#888'
-  return v >= 0 ? '#d32f2f' : '#2e7d32' // 红涨绿跌
+function cls(v: number | null): string {
+  if (v === null || v === 0) return 'text-flat'
+  return v > 0 ? 'text-up' : 'text-down'
 }
 function fmtPct(v: number | null): string {
   if (v === null) return '—'
@@ -32,44 +35,53 @@ function fmtPct(v: number | null): string {
 
 <template>
   <li class="row">
-    <input
-      type="checkbox"
-      title="加入对比"
-      :checked="inCompare(item.symbol)"
-      @change="toggleCompare(item.symbol)"
+    <Checkbox
+      :model-value="inCompare(item.symbol)"
+      binary
+      aria-label="加入对比"
+      @update:model-value="() => toggleCompare(item.symbol)"
     />
     <span class="info" @click="view(item.symbol)">
       <span class="name">{{ item.name }}</span>
       <span class="code">{{ item.symbol }}</span>
     </span>
-    <span class="quote">
+    <span class="quote tnum">
       <span class="px">{{ item.last_close?.toFixed(2) ?? '—' }}</span>
-      <span class="pct" :style="{ color: pctColor(item.change_pct) }">{{
-        fmtPct(item.change_pct)
-      }}</span>
+      <span class="pct" :class="cls(item.change_pct)">{{ fmtPct(item.change_pct) }}</span>
     </span>
-    <div class="grp">
-      <button
-        class="grp-btn"
-        :disabled="groups.length === 0"
-        title="设置分组"
-        @click="menuOpen = !menuOpen"
-      >
-        ⊞
-      </button>
-      <template v-if="menuOpen">
-        <div class="backdrop" @click="menuOpen = false"></div>
-        <ul class="grp-menu">
-          <li v-for="g in groups" :key="g.id">
-            <label>
-              <input type="checkbox" :checked="isIn(g.id)" @change="toggleGroup(g.id)" />
-              {{ g.name }}
-            </label>
-          </li>
-        </ul>
-      </template>
-    </div>
-    <button class="x" title="从自选删除" @click="remove(item.symbol)">×</button>
+    <Button
+      icon="pi pi-folder"
+      text
+      rounded
+      size="small"
+      severity="secondary"
+      :disabled="groups.length === 0"
+      aria-label="设置分组"
+      @click="op.toggle($event)"
+    />
+    <Button
+      icon="pi pi-times"
+      text
+      rounded
+      size="small"
+      severity="secondary"
+      aria-label="从自选删除"
+      @click="remove(item.symbol)"
+    />
+
+    <Popover ref="op">
+      <ul class="grp-menu">
+        <li v-for="g in groups" :key="g.id">
+          <Checkbox
+            :model-value="isIn(g.id)"
+            binary
+            :input-id="'g' + g.id + item.symbol"
+            @update:model-value="() => toggleGroup(g.id)"
+          />
+          <label :for="'g' + g.id + item.symbol">{{ g.name }}</label>
+        </li>
+      </ul>
+    </Popover>
   </li>
 </template>
 
@@ -77,12 +89,12 @@ function fmtPct(v: number | null): string {
 .row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
 }
 .row:hover {
-  background: #f6f7f9;
+  background: var(--c-surface-50);
 }
 .info {
   display: flex;
@@ -92,11 +104,11 @@ function fmtPct(v: number | null): string {
   min-width: 0;
 }
 .name {
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .code {
-  font-size: 11px;
-  color: #999;
+  font-size: var(--fs-caption);
+  color: var(--c-text-tertiary);
 }
 .quote {
   display: flex;
@@ -104,64 +116,29 @@ function fmtPct(v: number | null): string {
   align-items: flex-end;
 }
 .px {
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .pct {
-  font-size: 11px;
+  font-size: var(--fs-caption);
 }
-.grp {
-  position: relative;
-}
-.grp-btn {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: #888;
-  font-size: 14px;
-}
-.grp-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
+.row :deep(.p-button) {
+  width: 26px;
+  height: 26px;
 }
 .grp-menu {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  z-index: 11;
-  margin: 4px 0 0;
-  padding: 4px;
   list-style: none;
-  background: #fff;
-  border: 1px solid #e5e5e5;
-  border-radius: 6px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-  min-width: 120px;
-  max-height: 240px;
-  overflow: auto;
+  margin: 0;
+  padding: 0;
+  min-width: 130px;
 }
-.grp-menu label {
+.grp-menu li {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 6px;
-  font-size: 13px;
-  white-space: nowrap;
-  cursor: pointer;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--fs-sm);
 }
-.x {
-  border: none;
-  background: transparent;
-  color: #bbb;
+.grp-menu label {
   cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-}
-.x:hover {
-  color: #c62828;
 }
 </style>

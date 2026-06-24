@@ -1,53 +1,43 @@
 <script setup lang="ts">
+import SelectButton from 'primevue/selectbutton'
 import type { Adjust, Indicator, Period } from '../types/kline'
 
 const period = defineModel<Period>('period', { required: true })
 const adjust = defineModel<Adjust>('adjust', { required: true })
 const indicators = defineModel<Indicator[]>('indicators', { required: true })
 
-const PERIODS: { v: Period; label: string }[] = [
-  { v: 'd', label: '日' },
-  { v: 'w', label: '周' },
-  { v: 'm', label: '月' },
+const PERIODS = [
+  { label: '日', value: 'd' },
+  { label: '周', value: 'w' },
+  { label: '月', value: 'm' },
 ]
-const ADJUSTS: { v: Adjust; label: string }[] = [
-  { v: 'qfq', label: '前复权' },
-  { v: 'hfq', label: '后复权' },
-  { v: 'none', label: '不复权' },
+const ADJUSTS = [
+  { label: '前复权', value: 'qfq' },
+  { label: '后复权', value: 'hfq' },
+  { label: '不复权', value: 'none' },
 ]
 const INDICATORS: Indicator[] = ['MA', 'VOL', 'MACD', 'KDJ', 'RSI']
 </script>
 
 <template>
   <div class="toolbar">
-    <div class="group seg">
-      <button
-        v-for="p in PERIODS"
-        :key="p.v"
-        :class="{ active: period === p.v }"
-        @click="period = p.v"
-      >
-        {{ p.label }}
-      </button>
-    </div>
-
-    <div class="group seg">
-      <button
-        v-for="a in ADJUSTS"
-        :key="a.v"
-        :class="{ active: adjust === a.v }"
-        @click="adjust = a.v"
-      >
-        {{ a.label }}
-      </button>
-    </div>
-
-    <div class="group">
-      <label v-for="ind in INDICATORS" :key="ind" class="chk">
-        <input type="checkbox" :value="ind" v-model="indicators" />
-        {{ ind }}
-      </label>
-    </div>
+    <SelectButton
+      v-model="period"
+      :options="PERIODS"
+      option-label="label"
+      option-value="value"
+      :allow-empty="false"
+      size="small"
+    />
+    <SelectButton
+      v-model="adjust"
+      :options="ADJUSTS"
+      option-label="label"
+      option-value="value"
+      :allow-empty="false"
+      size="small"
+    />
+    <SelectButton v-model="indicators" :options="INDICATORS" multiple size="small" />
   </div>
 </template>
 
@@ -55,29 +45,8 @@ const INDICATORS: Indicator[] = ['MA', 'VOL', 'MACD', 'KDJ', 'RSI']
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--space-4);
   align-items: center;
-  padding: 4px 12px 10px;
-}
-.group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.seg button.active {
-  background: #1565c0;
-  color: #fff;
-  border-color: #1565c0;
-}
-.chk {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 13px;
-  cursor: pointer;
-}
-button {
-  padding: 5px 10px;
-  cursor: pointer;
+  padding: var(--space-1) var(--space-3) var(--space-3);
 }
 </style>
