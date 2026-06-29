@@ -1,6 +1,6 @@
 # 生产部署：一台机器跑前端(nginx) + 后端(FastAPI+APScheduler) + PostgreSQL。
-# 镜像由 GitHub Actions 构建并推到腾讯云 TCR，服务器只 pull。
-# 用法：docker compose --env-file .env.prod -f docker-compose.prod.yml pull && ... up -d
+# 镜像在服务器本地构建（国内不跨境）。
+# 用法：docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 services:
   db:
     image: postgres:17
@@ -18,7 +18,7 @@ services:
       retries: 10
 
   backend:
-    image: ${TCR_REGISTRY}/${TCR_NAMESPACE}/acquisition-backend:latest
+    build: ./backend
     restart: unless-stopped
     env_file: .env.prod # DATABASE_URL / JWT_SECRET / SCHEDULER_ENABLED / TZ ...
     depends_on:
@@ -28,7 +28,7 @@ services:
       - "8000"
 
   web:
-    image: ${TCR_REGISTRY}/${TCR_NAMESPACE}/acquisition-web:latest
+    build: ./frontend
     restart: unless-stopped
     depends_on:
       - backend

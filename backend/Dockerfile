@@ -3,14 +3,22 @@ FROM python:3.12-slim
 ENV TZ=Asia/Shanghai \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    UV_DEFAULT_INDEX=https://mirrors.tencentyun.com/pypi/simple \
+    PIP_INDEX_URL=https://mirrors.tencentyun.com/pypi/simple
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends tzdata ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# debian 源换清华镜像加速 apt（适配 bookworm 的 deb822 格式）
+RUN set -eux; \
+    if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+      sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' \
+        /etc/apt/sources.list.d/debian.sources; \
+    fi; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends tzdata ca-certificates; \
+    rm -rf /var/lib/apt/lists/*
 
-# uv 官方镜像提供二进制（GitHub runner 拉 ghcr.io 很快）
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# 用 pip（腾讯内网源）装 uv，避开国内访问慢的 ghcr.io
+RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 

@@ -1,29 +1,24 @@
 # 部署手册（M4 上云）
 
 一台轻量云服务器 + Docker Compose：**nginx（前端 + 反代）+ FastAPI（后端 + 盘后定时任务）+ PostgreSQL**。
-镜像由 **GitHub Actions 构建并推到腾讯云 TCR**，服务器只 `pull` 启动（不在本机构建）。
+镜像在**服务器本地构建**（纯国内部署，镜像不跨境；依赖走腾讯内网源 + 淘宝 npm 源，build 快）。
 
 ---
 
-## CI/CD：GitHub Actions + 腾讯云 TCR
+## CI/CD：GitHub Actions（SSH 触发服务器本地构建）
 
-push 到 `main` → GitHub runner 构建后端/前端镜像 → 推 TCR → SSH 到服务器 `docker compose pull && up -d`。
+push 到 `main` → GitHub SSH 到服务器 → `git reset --hard origin/main` + `docker compose up -d --build`（在服务器上构建并起容器）。
 
-**一次性配置：**
-1. 腾讯云开通 **容器镜像服务 TCR（个人版，免费）**，设访问凭证、建命名空间，建两个仓库 `acquisition-backend`、`acquisition-web`（首次推送一般自动创建）。
-2. GitHub 仓库 Secrets：`TCR_REGISTRY`(=`ccr.ccs.tencentyun.com`)、`TCR_NAMESPACE`、`TCR_USERNAME`、`TCR_PASSWORD`，以及部署用的 `SSH_HOST`/`SSH_USER`/`SSH_KEY`。
+**一次性配置（GitHub Secrets）：** `SSH_HOST`（服务器公网 IP）、`SSH_USER`（`ubuntu`）、`SSH_KEY`（CI→服务器的部署私钥，公钥在服务器 `authorized_keys`）。
 
-> `TCR_REGISTRY`/`TCR_NAMESPACE` **无需写进服务器 `.env.prod`**——CI 部署时会自动带进服务器 shell，compose 插值时 shell 优先于 env 文件。
+> 为什么不在 GitHub runner 构建后推镜像仓库：海外 runner 把 ~1GB 镜像跨境推到国内仓库同样慢/不稳。纯国内部署直接在服务器本地构建（用内网源）最省心、不跨境。
 
 之后合并到 `main` 即自动部署；也可在 Actions 页 `Run workflow` 手动触发。
 
-**服务器手动部署（不走 CI 时）：** 需自己带上 TCR 变量
+**服务器手动部署：**
 ```bash
 cd ~/acquisition && git pull
-export TCR_REGISTRY=ccr.ccs.tencentyun.com TCR_NAMESPACE=你的命名空间
-echo "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" -u "$TCR_USERNAME" --password-stdin
-docker compose --env-file .env.prod -f docker-compose.prod.yml pull
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
 
 ---
