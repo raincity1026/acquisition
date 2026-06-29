@@ -5,8 +5,8 @@ ENV TZ=Asia/Shanghai \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    UV_DEFAULT_INDEX=https://mirrors.tencentyun.com/pypi/simple \
-    PIP_INDEX_URL=https://mirrors.tencentyun.com/pypi/simple
+    UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/ \
+    PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
 # debian 源换清华镜像加速 apt（适配 bookworm 的 deb822 格式）
 RUN set -eux; \
