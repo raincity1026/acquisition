@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM python:3.12-slim
 
 ENV TZ=Asia/Shanghai \
@@ -22,12 +23,19 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
-# 先装依赖（利用缓存），再拷源码
+# 1) 只拷依赖清单 → 先装依赖（不装本项目）。依赖不变时这层走缓存，
+#    源码改动不会让它失效，避免每次部署全量重下 pandas/akshare 等。
+#    --mount=type=cache 把 uv 下载缓存持久化到磁盘，即便层失效也从本地秒装、不重下。
 COPY pyproject.toml uv.lock README.md ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+# 2) 再拷源码 → 只把本项目装进环境（很快，源码变动只动这层）。
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
-RUN uv sync --frozen --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
