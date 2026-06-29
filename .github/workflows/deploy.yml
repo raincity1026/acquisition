@@ -22,7 +22,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          command_timeout: 25m # 后端镜像本地构建（pandas 等）给足时间
+          command_timeout: 30m # 后端镜像本地构建（pandas 等）给足时间
           script: |
             set -e
             cd ~/acquisition

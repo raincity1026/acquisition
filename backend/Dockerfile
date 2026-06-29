@@ -5,6 +5,9 @@ ENV TZ=Asia/Shanghai \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
+    # 轻量服务器出网仅 ~900KB/s；uv 默认开十几条并发会把细管子挤爆、吞吐崩塌。
+    # 降到 2 条，顺着下，基本吃满带宽。
+    UV_CONCURRENT_DOWNLOADS=2 \
     UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/ \
     PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
