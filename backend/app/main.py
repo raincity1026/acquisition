@@ -6,6 +6,7 @@ from datetime import date
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.account_routes import router as account_router
 from app.api.routes import get_providers, router
@@ -46,6 +47,17 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="acquisition", version="0.1.0", lifespan=lifespan)
+
+# 前端(EdgeOne, stocks.marsian.cn) 与后端(api.stocks.marsian.cn) 不同源，需放行 CORS。
+# JWT 走 Authorization 头、不用 cookie，故 allow_credentials=False。
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(router)
 app.include_router(account_router)
 

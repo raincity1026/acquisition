@@ -17,5 +17,12 @@ class Settings(BaseSettings):
     update_minute: int = 30
     scheduler_timezone: str = "Asia/Shanghai"
 
+    # 允许跨域的前端来源（逗号分隔）。前端在 EdgeOne、后端在服务器 = 不同子域，需放行。
+    cors_origins: str = "http://localhost:5173"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
 
 settings = Settings()

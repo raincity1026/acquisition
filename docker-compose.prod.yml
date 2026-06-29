@@ -1,5 +1,5 @@
-# 生产部署：一台机器跑前端(nginx) + 后端(FastAPI+APScheduler) + PostgreSQL。
-# 镜像在服务器本地构建（国内不跨境）。
+# 生产部署：服务器跑 后端(FastAPI+APScheduler) + PostgreSQL + nginx(API网关)。
+# 前端在腾讯云 EdgeOne(stocks.marsian.cn)，不在这里；nginx 只反代 api.stocks.marsian.cn。
 # 用法：docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 services:
   db:
@@ -27,8 +27,8 @@ services:
     expose:
       - "8000"
 
-  web:
-    build: ./frontend
+  gateway:
+    image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on:
       - backend
@@ -36,6 +36,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      - ./nginx/api-gateway.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certbot/www:/var/www/certbot:ro # ACME 验证
       - ./certbot/conf:/etc/letsencrypt:ro # 证书（签发后）
 

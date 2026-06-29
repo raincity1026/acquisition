@@ -1,34 +1,38 @@
-# 部署手册（M4 上云）
+# 部署手册（上云）
 
-一台轻量云服务器 + Docker Compose：**nginx（前端 + 反代）+ FastAPI（后端 + 盘后定时任务）+ PostgreSQL**。
-镜像在**服务器本地构建**（纯国内部署，镜像不跨境；依赖走腾讯内网源 + 淘宝 npm 源，build 快）。
+架构 = **前端在腾讯云 EdgeOne（边缘加速）+ 后端在轻量服务器**，两个子域：
+- 前端 `stocks.marsian.cn` → EdgeOne Pages（连 GitHub 自动构建静态站、边缘分发）
+- 后端 `api.stocks.marsian.cn` → 服务器（FastAPI + PostgreSQL + 盘后任务 + nginx 网关）
+
+前后端不同源，靠**后端 CORS 放行** + **前端 `VITE_API_BASE` 指向 api 域名**联通（代码已处理）。
 
 ---
 
-## CI/CD：GitHub Actions（SSH 触发服务器本地构建）
+## 前端：EdgeOne Pages（你做，一次性）
+1. EdgeOne 控制台 → Pages → 连接 GitHub 仓库 `raincity1026/acquisition`。
+2. 构建配置：**根目录** `frontend`、**构建命令** `npm run build`、**输出目录** `dist`、监听分支 `main`。
+3. 环境变量：`VITE_API_BASE=https://api.stocks.marsian.cn`。
+4. 绑定域名 `stocks.marsian.cn`（EdgeOne 自动签 HTTPS）。
+> `frontend/.npmrc` 已配淘宝源，EdgeOne 国内构建 `npm` 不卡。以后改前端 push main，EdgeOne 自动重建。
 
-push 到 `main` → GitHub SSH 到服务器 → `git reset --hard origin/main` + `docker compose up -d --build`（在服务器上构建并起容器）。
+## 后端：服务器（CI 自动部署）
+push 到 `main` → GitHub SSH 到服务器 → `git reset --hard` + `docker compose up -d --build`（服务器本地构建后端镜像，用腾讯内网源，不跨境）。
+**GitHub Secrets：** `SSH_HOST` / `SSH_USER`(ubuntu) / `SSH_KEY`(CI→服务器部署私钥)。
+**服务器 `.env.prod`** 需含 `CORS_ORIGINS=https://stocks.marsian.cn`（放行前端跨域）。
+**手动部署：** `cd ~/acquisition && git pull && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build`
 
-**一次性配置（GitHub Secrets）：** `SSH_HOST`（服务器公网 IP）、`SSH_USER`（`ubuntu`）、`SSH_KEY`（CI→服务器的部署私钥，公钥在服务器 `authorized_keys`）。
-
-> 为什么不在 GitHub runner 构建后推镜像仓库：海外 runner 把 ~1GB 镜像跨境推到国内仓库同样慢/不稳。纯国内部署直接在服务器本地构建（用内网源）最省心、不跨境。
-
-之后合并到 `main` 即自动部署；也可在 Actions 页 `Run workflow` 手动触发。
-
-**服务器手动部署：**
-```bash
-cd ~/acquisition && git pull
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
-```
+## 后端 HTTPS（api 子域，你做）
+DNS：`api.stocks.marsian.cn` A 记录 → 服务器 IP（`stocks.marsian.cn` 走 EdgeOne CNAME）。
+证书：certbot 给 `api.stocks.marsian.cn` 签发，再打开 `nginx/api-gateway.conf` 的 443 段、重建 `gateway`。
 
 ---
 
 ## 已配好的（代码侧，无需你动）
 
-- `backend/Dockerfile` + `docker-entrypoint.sh`：起容器时自动 `alembic upgrade head` 再跑 uvicorn；内置 APScheduler 盘后任务。
-- `frontend/Dockerfile`：多阶段构建 Vue → nginx 托管静态文件 + 反代 `/api` 给后端（同域免跨域）。
-- `frontend/nginx.conf`：SPA 路由回退、`/api` 反代、ACME 验证位、HTTPS 模板（注释，签证书后开）。
-- `docker-compose.prod.yml`：三服务编排，PostgreSQL 数据持久化到卷 `pgdata`。
+- `backend/Dockerfile` + `docker-entrypoint.sh`：起容器时自动 `alembic upgrade head` 再跑 uvicorn；内置 APScheduler 盘后任务；CORS 放行前端域名。
+- `nginx/api-gateway.conf`：服务器 nginx 只反代 `api.stocks.marsian.cn` → backend，ACME 验证位、HTTPS 模板（注释，签证书后开）。
+- `frontend/`：Vue 静态站，由 EdgeOne Pages 构建（`npm run build`），`VITE_API_BASE` 指向后端域名；`.npmrc` 配淘宝源。
+- `docker-compose.prod.yml`：backend + db + gateway 三服务，PostgreSQL 数据持久化到卷 `pgdata`。
 - `.env.prod.example`：所有敏感配置走环境变量（`.env.prod` 已 gitignore）。
 - `scripts/backup.sh`：`pg_dump` 每日备份（配 crontab）。
 - **盘后更新**：交易日 18:30（`Asia/Shanghai`）增量刷新所有已入库标的；非交易日跳过；单只失败隔离 + 重试 + AKShare 降级。可在 `.env.prod` 改 `UPDATE_HOUR/MINUTE`、`SCHEDULER_ENABLED`。
