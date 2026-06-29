@@ -55,6 +55,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
+          TCR_NAMESPACE: ${{ secrets.TCR_NAMESPACE }}
           TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
           TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
         with:
@@ -63,7 +64,9 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           command_timeout: 10m
-          envs: TCR_REGISTRY,TCR_USERNAME,TCR_PASSWORD
+          # 把 TCR 变量带进服务器 shell；compose 插值时 shell 优先于 .env.prod，
+          # 所以 registry/namespace 无需写进服务器 .env.prod
+          envs: TCR_REGISTRY,TCR_NAMESPACE,TCR_USERNAME,TCR_PASSWORD
           script: |
             set -e
             cd ~/acquisition

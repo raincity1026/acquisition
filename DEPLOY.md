@@ -12,14 +12,16 @@ push 到 `main` → GitHub runner 构建后端/前端镜像 → 推 TCR → SSH 
 **一次性配置：**
 1. 腾讯云开通 **容器镜像服务 TCR（个人版，免费）**，设访问凭证、建命名空间，建两个仓库 `acquisition-backend`、`acquisition-web`（首次推送一般自动创建）。
 2. GitHub 仓库 Secrets：`TCR_REGISTRY`(=`ccr.ccs.tencentyun.com`)、`TCR_NAMESPACE`、`TCR_USERNAME`、`TCR_PASSWORD`，以及部署用的 `SSH_HOST`/`SSH_USER`/`SSH_KEY`。
-3. 服务器 `.env.prod` 里加 `TCR_REGISTRY` 和 `TCR_NAMESPACE`（compose 拼镜像名用，见 `.env.prod.example`）。
+
+> `TCR_REGISTRY`/`TCR_NAMESPACE` **无需写进服务器 `.env.prod`**——CI 部署时会自动带进服务器 shell，compose 插值时 shell 优先于 env 文件。
 
 之后合并到 `main` 即自动部署；也可在 Actions 页 `Run workflow` 手动触发。
 
-**服务器手动部署（不走 CI 时）：**
+**服务器手动部署（不走 CI 时）：** 需自己带上 TCR 变量
 ```bash
 cd ~/acquisition && git pull
-echo "$TCR_PASSWORD" | docker login ccr.ccs.tencentyun.com -u "$TCR_USERNAME" --password-stdin
+export TCR_REGISTRY=ccr.ccs.tencentyun.com TCR_NAMESPACE=你的命名空间
+echo "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" -u "$TCR_USERNAME" --password-stdin
 docker compose --env-file .env.prod -f docker-compose.prod.yml pull
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
 ```
