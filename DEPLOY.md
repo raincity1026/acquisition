@@ -1,6 +1,28 @@
 # 部署手册（M4 上云）
 
-一台轻量云服务器 + Docker Compose 全搞定：**nginx（前端 + 反代）+ FastAPI（后端 + 盘后定时任务）+ PostgreSQL**。
+一台轻量云服务器 + Docker Compose：**nginx（前端 + 反代）+ FastAPI（后端 + 盘后定时任务）+ PostgreSQL**。
+镜像由 **GitHub Actions 构建并推到腾讯云 TCR**，服务器只 `pull` 启动（不在本机构建）。
+
+---
+
+## CI/CD：GitHub Actions + 腾讯云 TCR
+
+push 到 `main` → GitHub runner 构建后端/前端镜像 → 推 TCR → SSH 到服务器 `docker compose pull && up -d`。
+
+**一次性配置：**
+1. 腾讯云开通 **容器镜像服务 TCR（个人版，免费）**，设访问凭证、建命名空间，建两个仓库 `acquisition-backend`、`acquisition-web`（首次推送一般自动创建）。
+2. GitHub 仓库 Secrets：`TCR_REGISTRY`(=`ccr.ccs.tencentyun.com`)、`TCR_NAMESPACE`、`TCR_USERNAME`、`TCR_PASSWORD`，以及部署用的 `SSH_HOST`/`SSH_USER`/`SSH_KEY`。
+3. 服务器 `.env.prod` 里加 `TCR_REGISTRY` 和 `TCR_NAMESPACE`（compose 拼镜像名用，见 `.env.prod.example`）。
+
+之后合并到 `main` 即自动部署；也可在 Actions 页 `Run workflow` 手动触发。
+
+**服务器手动部署（不走 CI 时）：**
+```bash
+cd ~/acquisition && git pull
+echo "$TCR_PASSWORD" | docker login ccr.ccs.tencentyun.com -u "$TCR_USERNAME" --password-stdin
+docker compose --env-file .env.prod -f docker-compose.prod.yml pull
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+```
 
 ---
 

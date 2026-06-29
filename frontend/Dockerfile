@@ -2,8 +2,7 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-# 用淘宝 npm 镜像加速国内安装
-RUN npm config set registry https://registry.npmmirror.com && npm ci
+RUN npm ci
 COPY . .
 RUN npm run build
 
