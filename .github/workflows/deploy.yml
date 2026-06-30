@@ -1,8 +1,7 @@
 name: Deploy
 
-# push 到 main：runner 构建后端镜像并推送到腾讯云 TCR；
-# 服务器从 TCR 拉取（理想情况走内网 endpoint，免费且不占公网带宽），
-# retag 成本地名后 compose up。镜像跨境只发生在 runner→TCR 这一程。
+# push 到 main：runner 构建后端镜像并推送到 TCR(香港端点，跨境不卡)；
+# 服务器从 TCR 拉取后 retag 成本地名，compose up。
 on:
   push:
     branches: [main]
@@ -20,20 +19,20 @@ jobs:
 
       - name: 构建并推送镜像到 TCR
         env:
-          IMAGE: ${{ secrets.TCR_REGISTRY }}/${{ secrets.TCR_NAMESPACE }}/acquisition-backend:latest
-          TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
+          # 完整镜像地址(不含 tag)，如 hkccr.ccs.tencentyun.com/acquisition/acquisition-backend
+          TCR_IMAGE: ${{ secrets.TCR_IMAGE }}
           TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
           TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
         run: |
-          echo "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" -u "$TCR_USERNAME" --password-stdin
-          docker build -t "$IMAGE" ./backend
-          docker push "$IMAGE"
+          TCR_HOST="${TCR_IMAGE%%/*}"   # 取第一个 / 前的主机名用于登录
+          echo "$TCR_PASSWORD" | docker login "$TCR_HOST" -u "$TCR_USERNAME" --password-stdin
+          docker build -t "$TCR_IMAGE:latest" ./backend
+          docker push "$TCR_IMAGE:latest"
 
       - name: 服务器拉取镜像并部署
         uses: appleboy/ssh-action@v1.2.0
         env:
-          IMAGE: ${{ secrets.TCR_REGISTRY }}/${{ secrets.TCR_NAMESPACE }}/acquisition-backend:latest
-          TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
+          TCR_IMAGE: ${{ secrets.TCR_IMAGE }}
           TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
           TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
         with:
@@ -42,15 +41,16 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           command_timeout: 15m
-          envs: IMAGE,TCR_REGISTRY,TCR_USERNAME,TCR_PASSWORD
+          envs: TCR_IMAGE,TCR_USERNAME,TCR_PASSWORD
           script: |
             set -e
             cd ~/acquisition
             git fetch origin main
             git reset --hard origin/main   # 同步 compose / nginx 等配置；不动 .env.prod
-            echo "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" -u "$TCR_USERNAME" --password-stdin
-            docker pull "$IMAGE"
-            docker tag "$IMAGE" acquisition-backend:latest   # compose 用本地名，pull_policy:never
+            TCR_HOST="${TCR_IMAGE%%/*}"
+            echo "$TCR_PASSWORD" | docker login "$TCR_HOST" -u "$TCR_USERNAME" --password-stdin
+            docker pull "$TCR_IMAGE:latest"
+            docker tag "$TCR_IMAGE:latest" acquisition-backend:latest   # compose 用本地名，pull_policy:never
             docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
             docker image prune -f
             docker compose -f docker-compose.prod.yml ps
