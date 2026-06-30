@@ -1,7 +1,8 @@
 name: Deploy
 
-# push 到 main：SSH 到服务器，git 拉最新 + 本地构建镜像 + 起容器。
-# （国内部署：镜像在服务器本地构建，不跨境推拉，依赖走腾讯内网源）
+# push 到 main：在 runner 上构建后端镜像（境外带宽足，拉 pypi 飞快），
+# save→gzip→单流传到服务器 docker load，服务器只起容器不构建。
+# （为何不在服务器构建：轻量服务器出网 ~900KB/s，多并发拉依赖会拥塞崩溃超时）
 on:
   push:
     branches: [main]
@@ -15,19 +16,39 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: SSH 到服务器构建并部署
+      - uses: actions/checkout@v4
+
+      - name: 构建后端镜像
+        run: docker build -t acquisition-backend:latest ./backend
+
+      - name: 导出并压缩镜像
+        run: docker save acquisition-backend:latest | gzip > backend-image.tar.gz
+
+      - name: 传镜像到服务器
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: backend-image.tar.gz
+          target: ~/acquisition/
+
+      - name: 服务器加载镜像并部署
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          command_timeout: 30m # 后端镜像本地构建（pandas 等）给足时间
+          command_timeout: 10m
           script: |
             set -e
             cd ~/acquisition
             git fetch origin main
-            git reset --hard origin/main   # 与远程一致；不动 .env.prod 等未跟踪文件
-            docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+            git reset --hard origin/main   # 同步 compose / nginx 等配置；不动 .env.prod
+            gunzip -c backend-image.tar.gz | docker load
+            rm -f backend-image.tar.gz
+            docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
             docker image prune -f
             docker compose -f docker-compose.prod.yml ps
