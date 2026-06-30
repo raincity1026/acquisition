@@ -52,5 +52,10 @@ jobs:
             docker pull "$TCR_IMAGE:latest"
             docker tag "$TCR_IMAGE:latest" acquisition-backend:latest   # compose 用本地名，pull_policy:never
             docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --remove-orphans
+            # api-gateway.conf 是挂载文件，compose 不会因它变化重建网关；
+            # 校验通过则热重载 nginx 让配置生效（无效则保留旧配置、不中断）。
+            docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T gateway nginx -t \
+              && docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T gateway nginx -s reload \
+              || echo "nginx reload skipped (config invalid or gateway down)"
             docker image prune -f
             docker compose -f docker-compose.prod.yml ps
