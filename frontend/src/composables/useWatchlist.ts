@@ -1,14 +1,26 @@
 import { ref } from 'vue'
-import { apiAddWatch, apiGetWatchlist, apiRemoveWatch, type WatchItem } from '../api/watchlist'
+import {
+  apiAddWatch,
+  apiCreateGroup,
+  apiDeleteGroup,
+  apiGetWatchlist,
+  apiListGroups,
+  apiRemoveWatch,
+  apiRenameGroup,
+  apiSetSymbolGroups,
+  type Group,
+  type WatchItem,
+} from '../api/watchlist'
 
 const items = ref<WatchItem[]>([])
+const groups = ref<Group[]>([])
 const loading = ref(false)
 
 export function useWatchlist() {
   async function reload(): Promise<void> {
     loading.value = true
     try {
-      items.value = await apiGetWatchlist()
+      ;[items.value, groups.value] = await Promise.all([apiGetWatchlist(), apiListGroups()])
     } finally {
       loading.value = false
     }
@@ -23,6 +35,33 @@ export function useWatchlist() {
     await apiRemoveWatch(symbol)
     await reload()
   }
+  async function createGroup(name: string): Promise<void> {
+    await apiCreateGroup(name)
+    await reload()
+  }
+  async function renameGroup(id: number, name: string): Promise<void> {
+    await apiRenameGroup(id, name)
+    await reload()
+  }
+  async function deleteGroup(id: number): Promise<void> {
+    await apiDeleteGroup(id)
+    await reload()
+  }
+  async function setSymbolGroups(symbol: string, groupIds: number[]): Promise<void> {
+    await apiSetSymbolGroups(symbol, groupIds)
+    await reload()
+  }
 
-  return { items, loading, reload, add, remove }
+  return {
+    items,
+    groups,
+    loading,
+    reload,
+    add,
+    remove,
+    createGroup,
+    renameGroup,
+    deleteGroup,
+    setSymbolGroups,
+  }
 }

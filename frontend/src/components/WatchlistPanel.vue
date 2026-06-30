@@ -1,115 +1,190 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useSelection } from '../composables/useSelection'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import { useConfirm } from 'primevue/useconfirm'
+import { useToast } from 'primevue/usetoast'
+import { computed, onMounted, reactive } from 'vue'
+import type { Group } from '../api/watchlist'
 import { useWatchlist } from '../composables/useWatchlist'
+import WatchRow from './WatchRow.vue'
 
-const { items, reload, remove } = useWatchlist()
-const { view, inCompare, toggleCompare } = useSelection()
+const { items, groups, reload, createGroup, renameGroup, deleteGroup } = useWatchlist()
+const confirm = useConfirm()
+const toast = useToast()
 
 onMounted(reload)
 
-function pctColor(v: number | null): string {
-  if (v === null) return '#888'
-  return v >= 0 ? '#d32f2f' : '#2e7d32' // A股红涨绿跌
+const ungrouped = computed(() => items.value.filter((i) => i.group_ids.length === 0))
+function itemsOf(gid: number) {
+  return items.value.filter((i) => i.group_ids.includes(gid))
 }
-function fmtPct(v: number | null): string {
-  if (v === null) return '—'
-  return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
+
+// 新建/重命名 共用一个对话框
+const dlg = reactive({ visible: false, mode: 'create' as 'create' | 'rename', id: 0, name: '' })
+function openCreate() {
+  Object.assign(dlg, { visible: true, mode: 'create', id: 0, name: '' })
+}
+function openRename(g: Group) {
+  Object.assign(dlg, { visible: true, mode: 'rename', id: g.id, name: g.name })
+}
+async function submitGroup() {
+  const name = dlg.name.trim()
+  if (!name) return
+  try {
+    if (dlg.mode === 'create') await createGroup(name)
+    else await renameGroup(dlg.id, name)
+    dlg.visible = false
+  } catch (e) {
+    toast.add({ severity: 'error', summary: '操作失败', detail: errMsg(e), life: 3000 })
+  }
+}
+function confirmDelete(g: Group) {
+  confirm.require({
+    header: '删除分组',
+    message: `删除分组「${g.name}」？组内股票会回到默认分组（不会从自选删除）。`,
+    icon: 'pi pi-exclamation-triangle',
+    rejectProps: { label: '取消', text: true },
+    acceptProps: { label: '删除', severity: 'danger' },
+    accept: () => deleteGroup(g.id),
+  })
+}
+
+function errMsg(e: unknown): string {
+  if (typeof e === 'object' && e && 'response' in e) {
+    const r = (e as { response?: { data?: { detail?: string } } }).response
+    if (r?.data?.detail) return r.data.detail
+  }
+  return '操作失败'
 }
 </script>
 
 <template>
   <aside class="watchlist">
-    <h3>自选股</h3>
+    <div class="head">
+      <h3>自选股</h3>
+      <Button label="分组" icon="pi pi-plus" text size="small" @click="openCreate" />
+    </div>
+
     <p v-if="items.length === 0" class="empty">用上方搜索添加标的</p>
-    <ul>
-      <li v-for="it in items" :key="it.symbol">
-        <input
-          type="checkbox"
-          title="加入对比"
-          :checked="inCompare(it.symbol)"
-          @change="toggleCompare(it.symbol)"
-        />
-        <span class="info" @click="view(it.symbol)">
-          <span class="name">{{ it.name }}</span>
-          <span class="code">{{ it.symbol }}</span>
-        </span>
-        <span class="quote">
-          <span class="px">{{ it.last_close?.toFixed(2) ?? '—' }}</span>
-          <span class="pct" :style="{ color: pctColor(it.change_pct) }">{{
-            fmtPct(it.change_pct)
-          }}</span>
-        </span>
-        <button class="x" title="删除" @click="remove(it.symbol)">×</button>
-      </li>
+
+    <!-- 无分组：扁平 -->
+    <ul v-if="groups.length === 0" class="list">
+      <WatchRow v-for="it in items" :key="it.symbol" :item="it" :groups="groups" />
     </ul>
+
+    <!-- 有分组：命名分组段（含空组）+ 默认分组段 -->
+    <template v-else>
+      <section v-for="g in groups" :key="g.id" class="section">
+        <div class="title">
+          <span class="gname">{{ g.name }}</span>
+          <span class="count">{{ itemsOf(g.id).length }}</span>
+          <Button
+            icon="pi pi-pencil"
+            text
+            rounded
+            size="small"
+            severity="secondary"
+            aria-label="重命名"
+            @click="openRename(g)"
+          />
+          <Button
+            icon="pi pi-trash"
+            text
+            rounded
+            size="small"
+            severity="secondary"
+            aria-label="删除分组"
+            @click="confirmDelete(g)"
+          />
+        </div>
+        <ul class="list">
+          <WatchRow
+            v-for="it in itemsOf(g.id)"
+            :key="g.id + '-' + it.symbol"
+            :item="it"
+            :groups="groups"
+          />
+        </ul>
+      </section>
+
+      <section class="section">
+        <div class="title">
+          <span class="gname">默认分组</span>
+          <span class="count">{{ ungrouped.length }}</span>
+        </div>
+        <ul class="list">
+          <WatchRow v-for="it in ungrouped" :key="'def-' + it.symbol" :item="it" :groups="groups" />
+        </ul>
+      </section>
+    </template>
+
+    <Dialog
+      v-model:visible="dlg.visible"
+      :header="dlg.mode === 'create' ? '新建分组' : '重命名分组'"
+      modal
+      :style="{ width: '300px' }"
+    >
+      <InputText v-model="dlg.name" placeholder="分组名" fluid autofocus @keyup.enter="submitGroup" />
+      <template #footer>
+        <Button label="取消" text @click="dlg.visible = false" />
+        <Button label="确定" @click="submitGroup" />
+      </template>
+    </Dialog>
   </aside>
 </template>
 
 <style scoped>
 .watchlist {
-  width: 240px;
-  border-right: 1px solid #eee;
-  padding: 10px 8px;
+  width: 250px;
+  border-right: 1px solid var(--c-border);
+  padding: var(--space-3) var(--space-2);
 }
-.watchlist h3 {
-  font-size: 14px;
-  margin: 4px 8px 10px;
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-1) var(--space-2);
+}
+.head h3 {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  margin: 0;
 }
 .empty {
-  color: #999;
-  font-size: 13px;
-  padding: 0 8px;
+  color: var(--c-text-tertiary);
+  font-size: var(--fs-sm);
+  padding: 0 var(--space-2);
 }
-ul {
+.list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-li {
+.section {
+  margin-bottom: var(--space-2);
+}
+.title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--fs-caption);
+  color: var(--c-text-secondary);
+  background: var(--c-surface-50);
+  border-radius: var(--radius-sm);
 }
-li:hover {
-  background: #f6f7f9;
+.gname {
+  font-weight: var(--fw-semibold);
 }
-.info {
-  display: flex;
-  flex-direction: column;
-  cursor: pointer;
-  flex: 1;
-  min-width: 0;
+.count {
+  color: var(--c-text-tertiary);
 }
-.name {
-  font-size: 13px;
+.title :deep(.p-button) {
+  width: 24px;
+  height: 24px;
 }
-.code {
-  font-size: 11px;
-  color: #999;
-}
-.quote {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-.px {
-  font-size: 13px;
-}
-.pct {
-  font-size: 11px;
-}
-.x {
-  border: none;
-  background: transparent;
-  color: #bbb;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-}
-.x:hover {
-  color: #c62828;
+.title :deep(.p-button:first-of-type) {
+  margin-left: auto;
 }
 </style>

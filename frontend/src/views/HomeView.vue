@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Button from 'primevue/button'
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MarketView from './MarketView.vue'
@@ -24,7 +25,7 @@ function doLogout() {
       <SearchBox />
       <div class="user">
         <span class="email">{{ email }}</span>
-        <button @click="doLogout">退出</button>
+        <Button label="退出" severity="secondary" text size="small" @click="doLogout" />
       </div>
     </header>
     <div class="body">
@@ -38,12 +39,14 @@ function doLogout() {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 10px 16px;
-  border-bottom: 1px solid #eee;
+  gap: var(--space-5);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-0);
 }
 .topbar h1 {
-  font-size: 17px;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
   margin: 0;
   white-space: nowrap;
 }
@@ -51,15 +54,11 @@ function doLogout() {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 13px;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
 }
 .user .email {
-  color: #666;
-}
-.user button {
-  padding: 5px 10px;
-  cursor: pointer;
+  color: var(--c-text-secondary);
 }
 .body {
   display: flex;
@@ -68,6 +67,6 @@ function doLogout() {
 .main {
   flex: 1;
   min-width: 0;
-  padding-top: 8px;
+  padding-top: var(--space-2);
 }
 </style>

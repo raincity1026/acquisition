@@ -3,7 +3,16 @@
 import datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, SmallInteger, String, func
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    SmallInteger,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -30,6 +39,29 @@ class WatchlistORM(Base):
     added_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class WatchlistGroupORM(Base):
+    __tablename__ = "watchlist_groups"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_group_user_name"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class WatchlistGroupMemberORM(Base):
+    """分组成员（多对多）。一只自选票可属多个分组；无成员记录=未分组=默认分组。"""
+
+    __tablename__ = "watchlist_group_members"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("watchlist_groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    symbol: Mapped[str] = mapped_column(String, primary_key=True)
 
 
 class InstrumentORM(Base):

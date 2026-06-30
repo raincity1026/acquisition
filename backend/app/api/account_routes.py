@@ -37,10 +37,24 @@ class WatchItemOut(BaseModel):
     name: str
     last_close: float | None
     change_pct: float | None
+    group_ids: list[int]
 
 
 class AddWatchIn(BaseModel):
     symbol: str
+
+
+class GroupOut(BaseModel):
+    id: int
+    name: str
+
+
+class GroupIn(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+
+
+class SetGroupsIn(BaseModel):
+    group_ids: list[int]
 
 
 @router.post("/auth/register", response_model=TokenOut)
@@ -79,9 +93,73 @@ async def get_watchlist(
 ) -> list[WatchItemOut]:
     items = await accounts.get_watchlist(session, user_id)
     return [
-        WatchItemOut(symbol=i.symbol, name=i.name, last_close=i.last_close, change_pct=i.change_pct)
+        WatchItemOut(
+            symbol=i.symbol,
+            name=i.name,
+            last_close=i.last_close,
+            change_pct=i.change_pct,
+            group_ids=i.group_ids,
+        )
         for i in items
     ]
+
+
+@router.get("/watchlist/groups", response_model=list[GroupOut])
+async def list_groups(
+    user_id: CurrentUser, session: Annotated[AsyncSession, Depends(get_session)]
+) -> list[GroupOut]:
+    return [
+        GroupOut(id=gid, name=name) for gid, name in await accounts.list_groups(session, user_id)
+    ]
+
+
+@router.post("/watchlist/groups", response_model=GroupOut, status_code=201)
+async def create_group(
+    body: GroupIn, user_id: CurrentUser, session: Annotated[AsyncSession, Depends(get_session)]
+) -> GroupOut:
+    try:
+        gid, name = await accounts.create_group(session, user_id, body.name)
+    except accounts.GroupNameTaken as exc:
+        raise HTTPException(status_code=409, detail="分组名已存在") from exc
+    return GroupOut(id=gid, name=name)
+
+
+@router.patch("/watchlist/groups/{group_id}", status_code=204)
+async def rename_group(
+    group_id: int,
+    body: GroupIn,
+    user_id: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> None:
+    try:
+        await accounts.rename_group(session, user_id, group_id, body.name)
+    except accounts.GroupNotFound as exc:
+        raise HTTPException(status_code=404, detail="分组不存在") from exc
+    except accounts.GroupNameTaken as exc:
+        raise HTTPException(status_code=409, detail="分组名已存在") from exc
+
+
+@router.delete("/watchlist/groups/{group_id}", status_code=204)
+async def delete_group(
+    group_id: int, user_id: CurrentUser, session: Annotated[AsyncSession, Depends(get_session)]
+) -> None:
+    try:
+        await accounts.delete_group(session, user_id, group_id)
+    except accounts.GroupNotFound as exc:
+        raise HTTPException(status_code=404, detail="分组不存在") from exc
+
+
+@router.put("/watchlist/{symbol}/groups", status_code=204)
+async def set_symbol_groups(
+    symbol: str,
+    body: SetGroupsIn,
+    user_id: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> None:
+    try:
+        await accounts.set_symbol_groups(session, user_id, symbol, body.group_ids)
+    except accounts.SymbolNotWatched as exc:
+        raise HTTPException(status_code=404, detail="该标的不在自选中") from exc
 
 
 @router.post("/watchlist", status_code=201)
