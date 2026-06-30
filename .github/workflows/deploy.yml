@@ -1,8 +1,8 @@
 name: Deploy
 
-# push 到 main：在 runner 上构建后端镜像（境外带宽足，拉 pypi 飞快），
-# save→gzip→单流传到服务器 docker load，服务器只起容器不构建。
-# （为何不在服务器构建：轻量服务器出网 ~900KB/s，多并发拉依赖会拥塞崩溃超时）
+# push 到 main：runner 构建后端镜像并推送到腾讯云 TCR；
+# 服务器从 TCR 拉取（理想情况走内网 endpoint，免费且不占公网带宽），
+# retag 成本地名后 compose up。镜像跨境只发生在 runner→TCR 这一程。
 on:
   push:
     branches: [main]
@@ -18,37 +18,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 构建后端镜像
-        run: docker build -t acquisition-backend:latest ./backend
+      - name: 构建并推送镜像到 TCR
+        env:
+          IMAGE: ${{ secrets.TCR_REGISTRY }}/${{ secrets.TCR_NAMESPACE }}/acquisition-backend:latest
+          TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+        run: |
+          echo "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" -u "$TCR_USERNAME" --password-stdin
+          docker build -t "$IMAGE" ./backend
+          docker push "$IMAGE"
 
-      - name: 导出并压缩镜像
-        run: docker save acquisition-backend:latest | gzip > backend-image.tar.gz
-
-      - name: 传镜像到服务器
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          source: backend-image.tar.gz
-          target: ~/acquisition/
-
-      - name: 服务器加载镜像并部署
+      - name: 服务器拉取镜像并部署
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE: ${{ secrets.TCR_REGISTRY }}/${{ secrets.TCR_NAMESPACE }}/acquisition-backend:latest
+          TCR_REGISTRY: ${{ secrets.TCR_REGISTRY }}
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          command_timeout: 10m
+          command_timeout: 15m
+          envs: IMAGE,TCR_REGISTRY,TCR_USERNAME,TCR_PASSWORD
           script: |
             set -e
             cd ~/acquisition
             git fetch origin main
             git reset --hard origin/main   # 同步 compose / nginx 等配置；不动 .env.prod
-            gunzip -c backend-image.tar.gz | docker load
-            rm -f backend-image.tar.gz
+            echo "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" -u "$TCR_USERNAME" --password-stdin
+            docker pull "$IMAGE"
+            docker tag "$IMAGE" acquisition-backend:latest   # compose 用本地名，pull_policy:never
             docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
             docker image prune -f
             docker compose -f docker-compose.prod.yml ps

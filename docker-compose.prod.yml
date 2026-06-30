@@ -1,7 +1,7 @@
 # 生产部署：服务器跑 后端(FastAPI+APScheduler) + PostgreSQL + nginx(API网关)。
 # 前端在腾讯云 EdgeOne(stocks.marsian.cn)，不在这里；nginx 只反代 api.stocks.marsian.cn。
 # 用法：docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
-# 后端镜像由 CI 在 runner 构建后 docker load 进来，这里不再 --build。
+# 后端镜像由 CI 推 TCR、服务器 pull 后 retag 成本地名，这里不再 --build。
 services:
   db:
     image: postgres:17
@@ -19,7 +19,7 @@ services:
       retries: 10
 
   backend:
-    image: acquisition-backend:latest # CI 在 runner 构建、save→服务器 docker load
+    image: acquisition-backend:latest # CI 推 TCR、服务器 pull 后 retag 成此名
     pull_policy: never # 本地已 load，禁止 compose 去仓库拉
     restart: unless-stopped
     env_file: .env.prod # DATABASE_URL / JWT_SECRET / SCHEDULER_ENABLED / TZ ...
