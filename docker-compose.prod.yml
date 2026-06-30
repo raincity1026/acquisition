@@ -22,7 +22,11 @@ services:
     image: acquisition-backend:latest # CI 推 TCR、服务器 pull 后 retag 成此名
     pull_policy: never # 本地已 load，禁止 compose 去仓库拉
     restart: unless-stopped
-    env_file: .env.prod # DATABASE_URL / JWT_SECRET / SCHEDULER_ENABLED / TZ ...
+    env_file: .env.prod # DATABASE_URL / JWT_SECRET 等敏感配置（仅服务器，不入库）
+    environment:
+      # 非敏感配置放这里版本化管理：改前端域名只需改这行 + push，不用上服务器。
+      # 多个来源用逗号分隔。environment 优先级高于 env_file。
+      CORS_ORIGINS: https://stocks.marsian.cn
     depends_on:
       db:
         condition: service_healthy
