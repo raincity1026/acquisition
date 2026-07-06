@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { InstrumentDetail } from '../api/instrument'
 import { deriveQuote } from '../utils/quote'
 import type { ApiBar } from '../types/kline'
+import GroupAssignButton from './GroupAssignButton.vue'
 
 const props = defineProps<{
   symbol: string
@@ -46,6 +47,7 @@ function vol(v: number | null): string {
       <span class="name">{{ name }}</span>
       <span class="sym">{{ symbol }}</span>
       <span v-if="detail?.industry" class="tag">{{ detail.industry }}</span>
+      <GroupAssignButton :symbol="symbol" />
     </div>
 
     <div class="quote">

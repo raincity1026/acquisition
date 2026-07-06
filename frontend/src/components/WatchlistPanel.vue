@@ -70,7 +70,7 @@ function errMsg(e: unknown): string {
 
     <!-- 无分组：扁平 -->
     <ul v-if="groups.length === 0" class="list">
-      <WatchRow v-for="it in items" :key="it.symbol" :item="it" :groups="groups" />
+      <WatchRow v-for="it in items" :key="it.symbol" :item="it" />
     </ul>
 
     <!-- 有分组：命名分组段（含空组）+ 默认分组段 -->
@@ -99,12 +99,7 @@ function errMsg(e: unknown): string {
           />
         </div>
         <ul class="list">
-          <WatchRow
-            v-for="it in itemsOf(g.id)"
-            :key="g.id + '-' + it.symbol"
-            :item="it"
-            :groups="groups"
-          />
+          <WatchRow v-for="it in itemsOf(g.id)" :key="g.id + '-' + it.symbol" :item="it" />
         </ul>
       </section>
 
@@ -114,7 +109,7 @@ function errMsg(e: unknown): string {
           <span class="count">{{ ungrouped.length }}</span>
         </div>
         <ul class="list">
-          <WatchRow v-for="it in ungrouped" :key="'def-' + it.symbol" :item="it" :groups="groups" />
+          <WatchRow v-for="it in ungrouped" :key="'def-' + it.symbol" :item="it" />
         </ul>
       </section>
     </template>
