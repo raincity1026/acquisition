@@ -36,6 +36,7 @@ function fmtPct(v: number | null): string {
       <span class="pct" :class="cls(item.change_pct)">{{ fmtPct(item.change_pct) }}</span>
     </span>
     <Button
+      class="del-btn"
       icon="pi pi-times"
       text
       rounded
@@ -86,5 +87,16 @@ function fmtPct(v: number | null): string {
 .row :deep(.p-button) {
   width: 26px;
   height: 26px;
+}
+/* 删除按钮默认隐藏，hover 该行或键盘聚焦时才出现（保留占位，行不抖动） */
+.del-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.row:hover .del-btn,
+.row:focus-within .del-btn {
+  opacity: 1;
+  pointer-events: auto;
 }
 </style>
