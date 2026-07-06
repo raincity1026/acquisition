@@ -50,6 +50,7 @@ function fmtPct(v: number | null): string {
 
 <style scoped>
 .row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -88,11 +89,23 @@ function fmtPct(v: number | null): string {
   width: 26px;
   height: 26px;
 }
-/* 删除按钮默认隐藏，hover 该行或键盘聚焦时才出现（保留占位，行不抖动） */
+/* 删除按钮绝对定位、默认脱离文档流（不占位，行内容用满宽度）。
+   hover 该行/键盘聚焦时：报价淡出、× 在原位淡入（互换），避免叠字，也不抖动。 */
 .del-btn {
+  position: absolute;
+  right: var(--space-1);
+  top: 50%;
+  transform: translateY(-50%);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s;
+}
+.quote {
+  transition: opacity 0.12s;
+}
+.row:hover .quote,
+.row:focus-within .quote {
+  opacity: 0;
 }
 .row:hover .del-btn,
 .row:focus-within .del-btn {
