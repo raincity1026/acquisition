@@ -11,14 +11,14 @@ import contextlib
 import logging
 import time
 from collections.abc import Callable, Iterator
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import baostock as bs  # pandas 垫片在 app.providers.__init__ 已先行
 
 from app.symbols import from_baostock, market_of, to_baostock
 
-from .base import Bar, DataProvider, Instrument
+from .base import Bar, DataProvider, Instrument, InstrumentDetail
 
 logger = logging.getLogger(__name__)
 _KLINE_FIELDS = "date,open,high,low,close,volume,amount,tradestatus"
@@ -134,6 +134,40 @@ class BaostockProvider(DataProvider):
                 )
             )
         return out
+
+    def get_instrument_detail(self, symbol: str) -> InstrumentDetail:
+        code = to_baostock(symbol)
+
+        def _fetch() -> tuple[list[list[str]], list[list[str]]]:
+            with _session():
+                ind = _rows(bs.query_stock_industry(code=code))
+                end = date.today()
+                start = end - timedelta(days=15)  # 近 15 天足够含最近交易日
+                val = _rows(
+                    bs.query_history_k_data_plus(
+                        code,
+                        "date,peTTM,pbMRQ",
+                        start_date=start.isoformat(),
+                        end_date=end.isoformat(),
+                        frequency="d",
+                        adjustflag="3",
+                    )
+                )
+            return ind, val
+
+        ind, val = _retry(_fetch)
+        # query_stock_industry 列: updateDate, code, code_name, industry, industryClassification
+        industry = ind[0][3].strip() or None if ind and len(ind[0]) > 3 else None
+
+        pe = pb = None
+        for row in reversed(val):  # 取最近一个有值的交易日
+            pe_s, pb_s = row[1].strip(), row[2].strip()
+            if pe_s or pb_s:
+                pe = float(pe_s) if pe_s else None
+                pb = float(pb_s) if pb_s else None
+                break
+
+        return InstrumentDetail(industry=industry, pe_ttm=pe, pb_mrq=pb)
 
     def get_trade_calendar(self, start: date, end: date) -> list[date]:
         def _fetch() -> list[list[str]]:
