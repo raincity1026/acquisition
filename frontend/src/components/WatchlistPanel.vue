@@ -126,7 +126,12 @@ function errMsg(e: unknown): string {
       </section>
     </template>
 
-    <Menu ref="menu" :model="menuItems" popup />
+    <Menu
+      ref="menu"
+      :model="menuItems"
+      popup
+      :pt="{ root: { style: 'min-width:6rem;transform:translateX(calc(-100% + 24px))' } }"
+    />
 
     <Dialog
       v-model:visible="dlg.visible"
