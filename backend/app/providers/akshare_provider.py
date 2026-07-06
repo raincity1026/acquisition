@@ -18,9 +18,9 @@ from decimal import Decimal
 import akshare as ak
 import pandas as pd
 
-from app.symbols import to_akshare_daily
+from app.symbols import to_akshare, to_akshare_daily
 
-from .base import Bar, DataProvider, Instrument
+from .base import Bar, DataProvider, Instrument, InstrumentDetail
 
 logger = logging.getLogger(__name__)
 _RETRY_TRIES = 4
@@ -44,6 +44,15 @@ def _dec(v: object) -> Decimal | None:
     if v is None or (isinstance(v, float) and pd.isna(v)):
         return None
     return Decimal(str(v))
+
+
+def _num(v: object) -> float | None:
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return None
+    try:
+        return float(str(v))
+    except (TypeError, ValueError):
+        return None
 
 
 def _market_from_code(code: str) -> str | None:
@@ -112,6 +121,15 @@ class AkshareProvider(DataProvider):
                 )
             )
         return out
+
+    def get_instrument_detail(self, symbol: str) -> InstrumentDetail:
+        code = to_akshare(symbol)  # 纯 6 位
+        df = _retry(lambda: ak.stock_individual_info_em(symbol=code), "individual-info")
+        info = dict(zip(df["item"], df["value"], strict=False))
+        return InstrumentDetail(
+            total_mv=_num(info.get("总市值")),
+            circ_mv=_num(info.get("流通市值")),
+        )
 
     def get_trade_calendar(self, start: date, end: date) -> list[date]:
         df = _retry(ak.tool_trade_date_hist_sina, "trade-cal")
