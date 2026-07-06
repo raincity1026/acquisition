@@ -6,7 +6,9 @@ import { computed, ref, watch } from 'vue'
 import ChartToolbar from '../components/ChartToolbar.vue'
 import ChartView from '../components/ChartView.vue'
 import CompareChart from '../components/CompareChart.vue'
+import StockDetail from '../components/StockDetail.vue'
 import { useCompare } from '../composables/useCompare'
+import { useInstrument } from '../composables/useInstrument'
 import { useKline } from '../composables/useKline'
 import { useSelection } from '../composables/useSelection'
 import type { Adjust, Indicator, Period } from '../types/kline'
@@ -21,6 +23,7 @@ const period = ref<Period>('d')
 const adjust = ref<Adjust>('qfq')
 const indicators = ref<Indicator[]>(['MA', 'VOL'])
 const { bars, loading: sLoading, error: sError } = useKline(primary, period, adjust)
+const { detail } = useInstrument(primary)
 
 // 对比态
 const baseDate = ref<string | null>(null)
@@ -40,6 +43,7 @@ const { data: cmp, loading: cLoading, error: cError } = useCompare(symbols, base
 
     <!-- 单股态 -->
     <template v-else-if="!isCompare">
+      <StockDetail :symbol="primary" :bars="bars" :detail="detail" />
       <ChartToolbar
         v-model:period="period"
         v-model:adjust="adjust"

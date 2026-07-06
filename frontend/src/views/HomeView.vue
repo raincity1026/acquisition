@@ -21,7 +21,6 @@ function doLogout() {
 <template>
   <div class="shell">
     <header class="topbar">
-      <h1>股票复盘</h1>
       <SearchBox />
       <div class="user">
         <span class="email">{{ email }}</span>
@@ -43,12 +42,6 @@ function doLogout() {
   padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--c-border);
   background: var(--c-surface-0);
-}
-.topbar h1 {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  margin: 0;
-  white-space: nowrap;
 }
 .user {
   margin-left: auto;
