@@ -20,3 +20,13 @@ table,
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* 弹出菜单从上往下展开（clip-path 揭示，不占用 transform，文字不变形） */
+@keyframes menu-unfold {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
