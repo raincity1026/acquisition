@@ -2,9 +2,10 @@
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import Menu from 'primevue/menu'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
-import { computed, onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import type { Group } from '../api/watchlist'
 import { useWatchlist } from '../composables/useWatchlist'
 import WatchRow from './WatchRow.vue'
@@ -50,6 +51,26 @@ function confirmDelete(g: Group) {
   })
 }
 
+// 分组「…」菜单：重命名/删除。单实例共享，点击时记住当前分组
+const menu = ref()
+const menuGroup = ref<Group | null>(null)
+const menuItems = computed(() => [
+  {
+    label: '重命名',
+    icon: 'pi pi-pencil',
+    command: () => menuGroup.value && openRename(menuGroup.value),
+  },
+  {
+    label: '删除',
+    icon: 'pi pi-trash',
+    command: () => menuGroup.value && confirmDelete(menuGroup.value),
+  },
+])
+function openMenu(e: Event, g: Group) {
+  menuGroup.value = g
+  menu.value.toggle(e)
+}
+
 function errMsg(e: unknown): string {
   if (typeof e === 'object' && e && 'response' in e) {
     const r = (e as { response?: { data?: { detail?: string } } }).response
@@ -80,22 +101,13 @@ function errMsg(e: unknown): string {
           <span class="gname">{{ g.name }}</span>
           <span class="count">{{ itemsOf(g.id).length }}</span>
           <Button
-            icon="pi pi-pencil"
+            icon="pi pi-ellipsis-h"
             text
             rounded
             size="small"
             severity="secondary"
-            aria-label="重命名"
-            @click="openRename(g)"
-          />
-          <Button
-            icon="pi pi-trash"
-            text
-            rounded
-            size="small"
-            severity="secondary"
-            aria-label="删除分组"
-            @click="confirmDelete(g)"
+            aria-label="分组操作"
+            @click="openMenu($event, g)"
           />
         </div>
         <ul class="list">
@@ -113,6 +125,8 @@ function errMsg(e: unknown): string {
         </ul>
       </section>
     </template>
+
+    <Menu ref="menu" :model="menuItems" popup />
 
     <Dialog
       v-model:visible="dlg.visible"
