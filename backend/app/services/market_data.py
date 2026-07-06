@@ -20,7 +20,7 @@ from app.core.adjust import apply_adjust
 from app.core.align import align
 from app.core.normalize import default_base_date, normalize
 from app.core.resample import resample
-from app.providers.base import Bar, DataProvider, Instrument
+from app.providers.base import Bar, DataProvider, Instrument, InstrumentDetail
 from app.storage import repository as repo
 
 logger = logging.getLogger(__name__)
@@ -178,4 +178,63 @@ async def compare(
             CompareSeries(sym, names[sym], norm[sym].values, norm[sym].latest_pct)
             for sym in symbols
         ],
+    )
+
+
+@dataclass
+class InstrumentDetailResult:
+    symbol: str
+    name: str
+    market: str
+    type: str
+    ipo_date: date | None
+    industry: str | None
+    pe_ttm: float | None
+    pb_mrq: float | None
+    total_mv: float | None
+    circ_mv: float | None
+
+
+def _merge_detail(base: InstrumentDetail, extra: InstrumentDetail) -> InstrumentDetail:
+    """缺失字段用 extra 补（base 已有的不覆盖 → 主源优先）。"""
+    return InstrumentDetail(
+        industry=base.industry if base.industry is not None else extra.industry,
+        pe_ttm=base.pe_ttm if base.pe_ttm is not None else extra.pe_ttm,
+        pb_mrq=base.pb_mrq if base.pb_mrq is not None else extra.pb_mrq,
+        total_mv=base.total_mv if base.total_mv is not None else extra.total_mv,
+        circ_mv=base.circ_mv if base.circ_mv is not None else extra.circ_mv,
+    )
+
+
+async def get_instrument_detail(
+    session: AsyncSession,
+    providers: Sequence[DataProvider],
+    symbol: str,
+) -> InstrumentDetailResult:
+    """详情：DB 取静态信息，逐源取基本面并按字段合并（主源优先，单源异常不致命）。"""
+    await _ensure_instrument(session, providers, symbol)
+    inst = await repo.get_instrument(session, symbol)
+    assert inst is not None  # _ensure_instrument 已保证存在
+
+    merged = InstrumentDetail()
+    for p in providers:
+        try:
+            d = await asyncio.to_thread(p.get_instrument_detail, symbol)
+        except Exception as e:  # noqa: BLE001 — 单源基本面失败不应致命
+            logger.warning("provider %s 详情失败，跳过: %s", type(p).__name__, e)
+            continue
+        if d is not None:
+            merged = _merge_detail(merged, d)
+
+    return InstrumentDetailResult(
+        symbol=symbol,
+        name=inst.name,
+        market=inst.market,
+        type=inst.type,
+        ipo_date=inst.ipo_date,
+        industry=merged.industry,
+        pe_ttm=merged.pe_ttm,
+        pb_mrq=merged.pb_mrq,
+        total_mv=merged.total_mv,
+        circ_mv=merged.circ_mv,
     )
