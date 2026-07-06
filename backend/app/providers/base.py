@@ -33,6 +33,17 @@ class Instrument:
     status: str  # listing / delisted
 
 
+@dataclass(frozen=True)
+class InstrumentDetail:
+    """个股低频信息（不含逐日行情）。各源只填自己能取到的字段，缺失留 None。"""
+
+    industry: str | None = None
+    pe_ttm: float | None = None
+    pb_mrq: float | None = None
+    total_mv: float | None = None  # 总市值(元)
+    circ_mv: float | None = None  # 流通市值(元)
+
+
 class DataProvider(ABC):
     """各数据源实现此接口；symbol 用内部规范，返回标准化结果。"""
 
@@ -47,3 +58,7 @@ class DataProvider(ABC):
     @abstractmethod
     def get_trade_calendar(self, start: date, end: date) -> list[date]:
         """交易日序列（已排除周末与节假日）。"""
+
+    def get_instrument_detail(self, symbol: str) -> InstrumentDetail | None:
+        """低频基本面；不支持的源返回 None（默认）。"""
+        return None
