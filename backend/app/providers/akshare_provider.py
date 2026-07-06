@@ -26,16 +26,17 @@ logger = logging.getLogger(__name__)
 _RETRY_TRIES = 4
 
 
-def _retry[T](op: Callable[[], T], label: str) -> T:
+def _retry[T](op: Callable[[], T], label: str, tries: int = _RETRY_TRIES) -> T:
     """akshare 偶发连接重置/限流，递增退避重试。"""
     last: Exception | None = None
-    for i in range(_RETRY_TRIES):
+    for i in range(tries):
         try:
             return op()
         except Exception as e:  # noqa: BLE001 — 爬取型接口异常类型杂，统一重试
             last = e
-            logger.warning("akshare %s 第 %d/%d 次失败: %s", label, i + 1, _RETRY_TRIES, e)
-            time.sleep(1.5 * (i + 1))
+            logger.warning("akshare %s 第 %d/%d 次失败: %s", label, i + 1, tries, e)
+            if i + 1 < tries:
+                time.sleep(1.5 * (i + 1))
     assert last is not None
     raise last
 
@@ -124,7 +125,8 @@ class AkshareProvider(DataProvider):
 
     def get_instrument_detail(self, symbol: str) -> InstrumentDetail:
         code = to_akshare(symbol)  # 纯 6 位
-        df = _retry(lambda: ak.stock_individual_info_em(symbol=code), "individual-info")
+        # 市值为可选字段，eastmoney 接口已知不稳定/慢；不重试以免拖慢主要的 Baostock 基本面数据
+        df = _retry(lambda: ak.stock_individual_info_em(symbol=code), "individual-info", tries=1)
         info = dict(zip(df["item"], df["value"], strict=False))
         return InstrumentDetail(
             total_mv=_num(info.get("总市值")),
