@@ -15,6 +15,10 @@ const groupIds = computed(
   () => items.value.find((i) => i.symbol === props.symbol)?.group_ids ?? [],
 )
 const watched = computed(() => items.value.some((i) => i.symbol === props.symbol))
+// 已归入分组时，标签后加 (n) 表示当前所属分组数
+const btnLabel = computed(() =>
+  groupIds.value.length > 0 ? `自选分组(${groupIds.value.length})` : '自选分组',
+)
 
 function isIn(gid: number): boolean {
   return groupIds.value.includes(gid)
@@ -35,7 +39,7 @@ async function toggleGroup(gid: number) {
   <Button
     class="grp-btn"
     icon="pi pi-plus"
-    label="自选分组"
+    :label="btnLabel"
     text
     size="small"
     severity="secondary"
