@@ -14,6 +14,7 @@ from app.services.market_data import (
     ProviderUnavailable,
     UnknownSymbol,
     compare,
+    get_instrument_detail,
     get_kline,
 )
 from app.storage import repository as repo
@@ -93,6 +94,45 @@ async def search(
     return [
         InstrumentOut(symbol=i.symbol, name=i.name, market=i.market, type=i.type) for i in items
     ]
+
+
+class InstrumentDetailOut(BaseModel):
+    symbol: str
+    name: str
+    market: str
+    type: str
+    ipo_date: date | None
+    industry: str | None
+    pe_ttm: float | None
+    pb_mrq: float | None
+    total_mv: float | None
+    circ_mv: float | None
+
+
+@router.get("/instrument/{symbol}", response_model=InstrumentDetailOut)
+async def instrument_detail(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    providers: Annotated[list[DataProvider], Depends(get_providers)],
+    symbol: str,
+) -> InstrumentDetailOut:
+    try:
+        r = await get_instrument_detail(session, providers, symbol)
+    except UnknownSymbol as exc:
+        raise HTTPException(status_code=404, detail=f"未知标的: {exc}") from exc
+    except ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"数据源暂不可用: {exc}") from exc
+    return InstrumentDetailOut(
+        symbol=r.symbol,
+        name=r.name,
+        market=r.market,
+        type=r.type,
+        ipo_date=r.ipo_date,
+        industry=r.industry,
+        pe_ttm=r.pe_ttm,
+        pb_mrq=r.pb_mrq,
+        total_mv=r.total_mv,
+        circ_mv=r.circ_mv,
+    )
 
 
 class CompareSeriesOut(BaseModel):
